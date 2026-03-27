@@ -1,20 +1,17 @@
 # python-security-auditing
 
-A reusable GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on any Python repository, then consolidates the results into a single PR comment, a workflow step summary, and a downloadable artifact.
+A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on a Python repository, then puts the results in one PR comment, the workflow step summary, and a downloadable artifact.
 
-## Why this action instead of using bandit or pip-audit directly?
+## When this might be useful
 
-| | `lhoupert/bandit-action` alone | `pypa/gh-action-pip-audit` alone | **this action** |
-|---|---|---|---|
-| Static code analysis (bandit) | ✅ | — | ✅ |
-| Dependency vulnerability scan (pip-audit) | — | ✅ | ✅ |
-| Unified PR comment | — | — | ✅ |
-| Configurable blocking thresholds | partial | partial | ✅ |
-| Multi-package-manager support | — | ✅ | ✅ |
-| Workflow step summary | — | — | ✅ |
-| Downloadable audit artifact | — | — | ✅ |
+Running bandit and pip-audit directly—or using focused actions like `PyCQA/bandit-action` or `pypa/gh-action-pip-audit`—is a reasonable and common approach. Those tools and actions are fine on their own.
 
-The core value is the **reporting layer**: instead of two separate actions producing separate outputs you have to check individually, you get one PR comment that is created on first run and updated in place on every subsequent run.
+This repo exists for workflows where you want **both** scanners behind **one** job and **one** place to read the outcome. It is a thin wrapper around the same tools, not a different kind of analysis. The things it adds on top of running the tools individually:
+
+- **One PR comment for both scanners** — created on the first run and updated in place on every subsequent push, so the PR thread stays clean.
+- **Workflow step summary** — the same report is written to the "Summary" tab of the workflow run.
+- **Block on fixable-only vulnerabilities** — `pip_audit_block_on: fixable` (the default) fails CI only when a patched version exists, so you can act on it immediately; unfixable CVEs are reported but don't block.
+- **Automatic requirements export** — pass `package_manager: uv|poetry|pipenv` and the action runs the appropriate export command before invoking pip-audit, saving you an extra workflow step.
 
 ## What the PR comment looks like
 
