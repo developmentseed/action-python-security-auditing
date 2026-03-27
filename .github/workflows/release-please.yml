@@ -9,6 +9,7 @@ permissions: {}
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
       pull-requests: write
@@ -54,3 +55,14 @@ jobs:
             --body "Automated: pin README SHA references to release ${{ steps.release.outputs.tag_name }}." \
             --base main \
             --head "$BRANCH"
+
+      - name: Notify tests repo to update action pin
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ secrets.TESTS_REPO_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/lhoupert/action-python-security-auditing-tests/dispatches \
+            --method POST \
+            -f event_type=action-release \
+            -F client_payload[sha]='${{ steps.release.outputs.sha }}' \
+            -F client_payload[tag]='${{ steps.release.outputs.tag_name }}'
