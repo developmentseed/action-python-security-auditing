@@ -43,45 +43,85 @@ def build_markdown(
 
 def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
     results: list[dict[str, Any]] = report.get("results", [])
-    lines = ["## Bandit — Static Security Analysis\n"]
+    security_url = (
+        f"https://github.com/{settings.github_repository}/security/code-scanning"
+        if settings.github_repository
+        else ""
+    )
+    heading = (
+        f"## Bandit — Static Security Analysis ([Security tab]({security_url}))\n"
+        if security_url
+        else "## Bandit — Static Security Analysis\n"
+    )
+    lines = [heading]
 
     if not results:
         lines.append("✅ No issues found.\n")
         return "\n".join(lines)
 
-    lines.append("| Severity | Confidence | File | Line | Issue |\n" "|---|---|---|---|---|\n")
+    _severity_order = ["HIGH", "MEDIUM", "LOW"]
+    counts: dict[str, int] = {}
     for r in results:
-        sev = r.get("issue_severity", "")
-        conf = r.get("issue_confidence", "")
-        icon = _SEVERITY_ICON.get(sev, "")
-        fname = r.get("filename", "")
-        line = r.get("line_number", "")
-        text = r.get("issue_text", "").replace("|", "\\|")
-        test_id = r.get("test_id", "")
-        lines.append(f"| {icon} {sev} | {conf} | `{fname}` | {line} | [{test_id}] {text} |")
+        sev = r.get("issue_severity", "UNKNOWN")
+        counts[sev] = counts.get(sev, 0) + 1
+    summary = ", ".join(f"{counts[s]} {s.lower()}" for s in _severity_order if s in counts)
+    lines.append(f"**{len(results)} issue(s) found:** {summary}\n")
 
     blocking_results = [
         r for r in results if r.get("issue_severity") in settings.blocking_severities
     ]
-    lines.append(
-        f"\n_{len(results)} issue(s) found, "
-        f"{len(blocking_results)} at or above "
-        f"{settings.bandit_severity_threshold.upper()} threshold._\n"
-    )
+    lower_results = [
+        r for r in results if r.get("issue_severity") not in settings.blocking_severities
+    ]
+
+    if blocking_results:
+        lines.append("| Severity | Confidence | File | Line | Issue |\n|---|---|---|---|---|")
+        for r in blocking_results:
+            sev = r.get("issue_severity", "")
+            conf = r.get("issue_confidence", "")
+            icon = _SEVERITY_ICON.get(sev, "")
+            fname = r.get("filename", "")
+            line = r.get("line_number", "")
+            text = r.get("issue_text", "").replace("|", "\\|")
+            test_id = r.get("test_id", "")
+            lines.append(f"| {icon} {sev} | {conf} | `{fname}` | {line} | [{test_id}] {text} |")
+    else:
+        lines.append(
+            f"✅ No issues at or above {settings.bandit_severity_threshold.upper()} severity."
+        )
+
+    if lower_results:
+        lower_counts: dict[str, int] = {}
+        for r in lower_results:
+            sev = r.get("issue_severity", "UNKNOWN")
+            lower_counts[sev] = lower_counts.get(sev, 0) + 1
+        lower_summary = ", ".join(
+            f"{lower_counts[s]} {s.lower()}" for s in _severity_order if s in lower_counts
+        )
+        lines.append(f"\n_{lower_summary} issue(s) below threshold not shown in table._\n")
+
     return "\n".join(lines)
 
 
 def _pip_audit_section(report: list[dict[str, Any]], settings: Settings) -> str:
     vulnerable = [pkg for pkg in report if pkg.get("vulns")]
-    lines = ["## pip-audit — Dependency Vulnerabilities\n"]
+    security_url = (
+        f"https://github.com/{settings.github_repository}/security/dependabot"
+        if settings.github_repository
+        else ""
+    )
+    heading = (
+        f"## pip-audit — Dependency Vulnerabilities ([Security tab]({security_url}))\n"
+        if security_url
+        else "## pip-audit — Dependency Vulnerabilities\n"
+    )
+    lines = [heading]
 
     if not vulnerable:
         lines.append("✅ No vulnerabilities found.\n")
         return "\n".join(lines)
 
-    lines.append(
-        "| Package | Version | ID | Fix Versions | Description |\n" "|---|---|---|---|---|\n"
-    )
+    lines.append("| Package | Version | ID | Fix Versions | Description |\n|---|---|---|---|---|")
     for pkg in vulnerable:
         name = pkg.get("name", "")
         version = pkg.get("version", "")
