@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.0...v0.3.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* fix ci to pin update in readme ([#16](https://github.com/lhoupert/action-python-security-auditing/issues/16)) ([a97a516](https://github.com/lhoupert/action-python-security-auditing/commit/a97a51680c9e269100dc9b18f7d098bac878b4c0))
+
 ## [0.3.0](https://github.com/lhoupert/action-python-security-auditing/compare/v0.2.0...v0.3.0) (2026-03-27)
 
 
