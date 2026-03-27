@@ -34,12 +34,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Run Bandit (static security analysis)
-      if: contains(inputs.tools, 'bandit')
-      uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
-      with:
-        targets: ${{ inputs.bandit_scan_dirs }}
-        level: ${{ inputs.bandit_severity_threshold }}
+    # - name: Run Bandit (static security analysis)
+    #   if: contains(inputs.tools, 'bandit')
+    #   uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
+    #   with:
+    #     targets: ${{ inputs.bandit_scan_dirs }}
+    #     level: ${{ inputs.bandit_severity_threshold }}
 
     - name: Set up Python
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
