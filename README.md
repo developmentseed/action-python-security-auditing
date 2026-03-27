@@ -121,7 +121,7 @@ Useful when you manage dependencies externally or run pip-audit in a separate jo
   with:
     working_directory: services/api
     package_manager: uv
-    bandit_scan_dirs: 'services/api/src/'
+    bandit_scan_dirs: 'src/'
 ```
 
 ### Audit-only mode (never block the job)
@@ -160,7 +160,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 | Input | Default | Description |
 |---|---|---|
 | `tools` | `bandit,pip-audit` | Comma-separated tools to run |
-| `bandit_scan_dirs` | `.` | Comma-separated directories for bandit to scan |
+| `bandit_scan_dirs` | `.` | Comma-separated directories for bandit to scan (relative to `working_directory`) |
 | `bandit_severity_threshold` | `high` | Minimum severity that blocks the job: `high`, `medium`, or `low` |
 | `pip_audit_block_on` | `fixable` | When pip-audit findings block the job: `fixable`, `all`, or `none` |
 | `package_manager` | `requirements` | How to resolve deps for pip-audit: `uv`, `pip`, `poetry`, `pipenv`, `requirements` |
