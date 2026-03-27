@@ -39,8 +39,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          sed -i \
-            's|developmentseed/python-security-auditing@[^ ]*\( # v[0-9][^ ]*\)\?|developmentseed/python-security-auditing@${{ steps.release.outputs.sha }} # ${{ steps.release.outputs.tag_name }}|g' \
+          sed -i -E \
+            's|developmentseed/python-security-auditing@[^ ]+( # v[0-9][^ ]*)?|developmentseed/python-security-auditing@${{ steps.release.outputs.sha }} # ${{ steps.release.outputs.tag_name }}|g' \
             README.md
           git add README.md
           git diff --cached --quiet && echo "README unchanged, skipping commit" && exit 0
