@@ -1,5 +1,7 @@
 # python-security-auditing
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lhoupert/action-python-security-auditing/badge)](https://scorecard.dev/viewer/?uri=github.com/lhoupert/action-python-security-auditing)
+
 A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on a Python repository, then puts the results in one PR comment, the workflow step summary, and a downloadable artifact.
 
 ## When this might be useful
