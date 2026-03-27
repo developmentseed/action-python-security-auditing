@@ -38,7 +38,7 @@ jobs:
       - name: Pin README to release SHA
         if: ${{ steps.release.outputs.release_created }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           sed -i -E \
             's|developmentseed/python-security-auditing@[^ ]+( # v[0-9][^ ]*)?|developmentseed/python-security-auditing@${{ steps.release.outputs.sha }} # ${{ steps.release.outputs.tag_name }}|g' \
