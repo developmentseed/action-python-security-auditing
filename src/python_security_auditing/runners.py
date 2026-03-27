@@ -123,6 +123,6 @@ def run_pip_audit(requirements_path: Path) -> list[dict[str, Any]]:
         output_file.write_text(raw)
         # pip-audit 2.7+ wraps output in {"dependencies": [...], "fixes": [...]}
         if isinstance(parsed, dict):
-            return parsed.get("dependencies", [])
-        return parsed
+            return list(parsed.get("dependencies", []))
+        return list(parsed)
     return []
