@@ -1,0 +1,62 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Bandit"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "B404",
+          "level": "error",
+          "message": {
+            "text": "Consider possible security implications associated with subprocess module."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/app.py"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH",
+            "issue_text": "Consider possible security implications associated with subprocess module."
+          }
+        },
+        {
+          "ruleId": "B602",
+          "level": "warning",
+          "message": {
+            "text": "subprocess call with shell=True identified, security issue."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/app.py"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "MEDIUM",
+            "issue_severity": "MEDIUM",
+            "issue_text": "subprocess call with shell=True identified, security issue."
+          }
+        }
+      ]
+    }
+  ]
+}

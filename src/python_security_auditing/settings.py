@@ -15,9 +15,10 @@ class Settings(BaseSettings):
     # Tool selection
     tools: str = "bandit,pip-audit"
 
-    # Bandit config
-    bandit_scan_dirs: str = "."
-    bandit_severity_threshold: Literal["HIGH", "MEDIUM", "LOW"] = "HIGH"
+    # Bandit config — scan dirs and threshold are passed directly to lhoupert/bandit-action;
+    # the Python module only reads the SARIF output and uses the threshold for reporting.
+    bandit_severity_threshold: Literal["high", "medium", "low"] = "high"
+    bandit_sarif_path: str = "results.sarif"
 
     # pip-audit config
     pip_audit_block_on: Literal["fixable", "all", "none"] = "fixable"
@@ -43,12 +44,8 @@ class Settings(BaseSettings):
         return [t.strip() for t in self.tools.split(",") if t.strip()]
 
     @property
-    def scan_directories(self) -> list[str]:
-        return [d.strip() for d in self.bandit_scan_dirs.split(",") if d.strip()]
-
-    @property
     def blocking_severities(self) -> list[str]:
         """All severities at or above the configured threshold."""
         all_severities = ["LOW", "MEDIUM", "HIGH"]
-        threshold_idx = all_severities.index(self.bandit_severity_threshold)
+        threshold_idx = all_severities.index(self.bandit_severity_threshold.upper())
         return all_severities[threshold_idx:]

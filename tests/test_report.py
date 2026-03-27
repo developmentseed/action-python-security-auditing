@@ -73,7 +73,7 @@ def test_bandit_medium_does_not_block_at_high_threshold(
 def test_bandit_medium_blocks_at_medium_threshold(
     bandit_issues: dict[str, Any], pip_clean: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "MEDIUM")
+    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "medium")
     s = Settings()
     medium_only = {
         **bandit_issues,

@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from python_security_auditing.runners import generate_requirements, run_bandit, run_pip_audit
+from python_security_auditing.runners import generate_requirements, read_bandit_sarif, run_pip_audit
 from python_security_auditing.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -84,49 +84,61 @@ def test_pipenv_mode_calls_pipenv_requirements(monkeypatch: pytest.MonkeyPatch) 
 
 
 # ---------------------------------------------------------------------------
-# run_bandit
+# read_bandit_sarif
 # ---------------------------------------------------------------------------
 
 
-def test_run_bandit_parses_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    fixture = json.loads((FIXTURES / "bandit_issues.json").read_text())
-
-    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stderr="")
-        # Simulate bandit writing the output file
-        (tmp_path / "bandit-report.json").write_text(json.dumps(fixture))
-        report = run_bandit(["src"])
+def test_read_bandit_sarif_parses_findings(tmp_path: Path) -> None:
+    sarif_path = tmp_path / "results.sarif"
+    sarif_path.write_text((FIXTURES / "bandit_issues.sarif").read_text())
+    report = read_bandit_sarif(sarif_path)
 
     assert len(report["results"]) == 2
     assert report["results"][0]["issue_severity"] == "HIGH"
+    assert report["results"][0]["issue_confidence"] == "HIGH"
+    assert report["results"][0]["test_id"] == "B404"
+    assert report["results"][0]["filename"] == "src/app.py"
+    assert report["results"][0]["line_number"] == 2
+    assert report["results"][1]["issue_severity"] == "MEDIUM"
 
 
-def test_run_bandit_returns_empty_on_missing_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(tmp_path)
+def test_read_bandit_sarif_returns_empty_on_missing_file(tmp_path: Path) -> None:
+    report = read_bandit_sarif(tmp_path / "results.sarif")
+    assert report["results"] == []
+    assert report["errors"] == []
 
-    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        report = run_bandit(["."])
 
+def test_read_bandit_sarif_returns_empty_on_clean_sarif(tmp_path: Path) -> None:
+    sarif_path = tmp_path / "results.sarif"
+    sarif_path.write_text((FIXTURES / "bandit_clean.sarif").read_text())
+    report = read_bandit_sarif(sarif_path)
     assert report["results"] == []
 
 
-def test_run_bandit_passes_dirs_to_cmd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "bandit-report.json").write_text('{"results": [], "errors": []}')
-
-    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        run_bandit(["src/", "scripts/"])
-
-    cmd = mock_run.call_args[0][0]
-    assert "src/" in cmd
-    assert "scripts/" in cmd
-    assert "-f" in cmd
-    assert "json" in cmd
+def test_read_bandit_sarif_falls_back_to_level_mapping(tmp_path: Path) -> None:
+    sarif_path = tmp_path / "results.sarif"
+    sarif_path.write_text(
+        json.dumps(
+            {
+                "version": "2.1.0",
+                "runs": [
+                    {
+                        "results": [
+                            {
+                                "ruleId": "B999",
+                                "level": "warning",
+                                "message": {"text": "test issue"},
+                                "locations": [],
+                                "properties": {},
+                            }
+                        ]
+                    }
+                ],
+            }
+        )
+    )
+    report = read_bandit_sarif(sarif_path)
+    assert report["results"][0]["issue_severity"] == "MEDIUM"
 
 
 # ---------------------------------------------------------------------------

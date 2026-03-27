@@ -25,7 +25,7 @@ Reusable GitHub Action that runs [bandit](https://bandit.readthedocs.io/) and [p
 - uses: developmentseed/python-security-auditing@v1
   with:
     package_manager: poetry
-    bandit_severity_threshold: MEDIUM
+    bandit_severity_threshold: medium
     pip_audit_block_on: all
 ```
 
@@ -44,7 +44,7 @@ Reusable GitHub Action that runs [bandit](https://bandit.readthedocs.io/) and [p
 |---|---|---|
 | `tools` | `bandit,pip-audit` | Comma-separated tools to run |
 | `bandit_scan_dirs` | `.` | Comma-separated directories for bandit to scan |
-| `bandit_severity_threshold` | `HIGH` | Minimum severity that blocks the job: `HIGH`, `MEDIUM`, or `LOW` |
+| `bandit_severity_threshold` | `high` | Minimum severity that blocks the job: `high`, `medium`, or `low` |
 | `pip_audit_block_on` | `fixable` | Block on: `fixable` (has a fix), `all`, or `none` |
 | `package_manager` | `requirements` | How to resolve deps: `uv`, `pip`, `poetry`, `pipenv`, `requirements` |
 | `requirements_file` | `requirements.txt` | Path when `package_manager=requirements` |

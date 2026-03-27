@@ -62,22 +62,46 @@ def generate_requirements(settings: Settings) -> Path:
     return out_path
 
 
-def run_bandit(scan_dirs: list[str]) -> dict[str, Any]:
-    """Run bandit, write bandit-report.json, return parsed report."""
-    output_file = Path("bandit-report.json")
-    cmd = ["bandit", "-r", *scan_dirs, "-f", "json", "-o", str(output_file)]
+_SARIF_LEVEL_TO_SEVERITY: dict[str, str] = {
+    "error": "HIGH",
+    "warning": "MEDIUM",
+    "note": "LOW",
+    "none": "LOW",
+}
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    # bandit exits 1 when issues are found — that is expected, not an error
-    if result.returncode not in (0, 1):
-        print(
-            f"bandit exited with unexpected code {result.returncode}:\n{result.stderr}",
-            file=sys.stderr,
+
+def read_bandit_sarif(sarif_path: Path) -> dict[str, Any]:
+    """Read results.sarif produced by lhoupert/bandit-action, return bandit-style report dict."""
+    if not sarif_path.exists():
+        return {"results": [], "errors": []}
+
+    sarif: dict[str, Any] = json.loads(sarif_path.read_text())
+    sarif_results: list[dict[str, Any]] = sarif.get("runs", [{}])[0].get("results", [])
+    results: list[dict[str, Any]] = []
+    for sarif_result in sarif_results:
+        props: dict[str, Any] = sarif_result.get("properties", {})
+        severity = props.get("issue_severity") or _SARIF_LEVEL_TO_SEVERITY.get(
+            sarif_result.get("level", "none"), "LOW"
+        )
+        locations: list[dict[str, Any]] = sarif_result.get("locations", [])
+        filename = ""
+        line_number = 0
+        if locations:
+            phys = locations[0].get("physicalLocation", {})
+            filename = phys.get("artifactLocation", {}).get("uri", "")
+            line_number = phys.get("region", {}).get("startLine", 0)
+        results.append(
+            {
+                "issue_severity": severity,
+                "issue_confidence": props.get("issue_confidence", ""),
+                "issue_text": sarif_result.get("message", {}).get("text", ""),
+                "filename": filename,
+                "line_number": line_number,
+                "test_id": sarif_result.get("ruleId", ""),
+            }
         )
 
-    if output_file.exists():
-        return dict(json.loads(output_file.read_text()))
-    return {"results": [], "errors": []}
+    return {"results": results, "errors": []}
 
 
 def run_pip_audit(requirements_path: Path) -> list[dict[str, Any]]:

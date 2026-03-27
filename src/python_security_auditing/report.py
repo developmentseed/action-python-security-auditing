@@ -65,7 +65,7 @@ def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
     ]
     lines.append(
         f"\n_{len(results)} issue(s) found, "
-        f"{len(blocking_results)} at or above {settings.bandit_severity_threshold} threshold._\n"
+        f"{len(blocking_results)} at or above {settings.bandit_severity_threshold.upper()} threshold._\n"
     )
     return "\n".join(lines)
 

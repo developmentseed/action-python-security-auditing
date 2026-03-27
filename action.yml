@@ -10,8 +10,8 @@ inputs:
     description: Comma-separated directories for bandit to scan
     default: .
   bandit_severity_threshold:
-    description: Minimum bandit severity that blocks the job (HIGH, MEDIUM, LOW)
-    default: HIGH
+    description: Minimum bandit severity that blocks the job (high, medium, low)
+    default: high
   pip_audit_block_on:
     description: When to block on pip-audit findings — fixable, all, or none
     default: fixable
@@ -34,6 +34,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Run Bandit (static security analysis)
+      if: contains(inputs.tools, 'bandit')
+      uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
+      with:
+        targets: ${{ inputs.bandit_scan_dirs }}
+        level: ${{ inputs.bandit_severity_threshold }}
+
     - name: Set up Python
       uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
       with:
@@ -50,8 +57,8 @@ runs:
       working-directory: ${{ inputs.working_directory }}
       env:
         TOOLS: ${{ inputs.tools }}
-        BANDIT_SCAN_DIRS: ${{ inputs.bandit_scan_dirs }}
         BANDIT_SEVERITY_THRESHOLD: ${{ inputs.bandit_severity_threshold }}
+        BANDIT_SARIF_PATH: ${{ github.workspace }}/results.sarif
         PIP_AUDIT_BLOCK_ON: ${{ inputs.pip_audit_block_on }}
         PACKAGE_MANAGER: ${{ inputs.package_manager }}
         REQUIREMENTS_FILE: ${{ inputs.requirements_file }}
@@ -66,7 +73,6 @@ runs:
       with:
         name: security-audit-reports
         path: |
-          ${{ inputs.working_directory }}/bandit-report.json
           ${{ inputs.working_directory }}/pip-audit-report.json
         if-no-files-found: ignore
 

@@ -7,8 +7,8 @@ from python_security_auditing.settings import Settings
 def test_defaults() -> None:
     s = Settings()
     assert s.tools == "bandit,pip-audit"
-    assert s.bandit_scan_dirs == "."
-    assert s.bandit_severity_threshold == "HIGH"
+    assert s.bandit_severity_threshold == "high"
+    assert s.bandit_sarif_path == "results.sarif"
     assert s.pip_audit_block_on == "fixable"
     assert s.package_manager == "requirements"
     assert s.requirements_file == "requirements.txt"
@@ -39,15 +39,10 @@ def test_enabled_tools_whitespace(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.enabled_tools == ["bandit", "pip-audit"]
 
 
-def test_scan_directories_default() -> None:
+def test_bandit_sarif_path_custom(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BANDIT_SARIF_PATH", "/workspace/results.sarif")
     s = Settings()
-    assert s.scan_directories == ["."]
-
-
-def test_scan_directories_multiple(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BANDIT_SCAN_DIRS", "src/,scripts/")
-    s = Settings()
-    assert s.scan_directories == ["src/", "scripts/"]
+    assert s.bandit_sarif_path == "/workspace/results.sarif"
 
 
 def test_blocking_severities_high() -> None:
@@ -56,13 +51,13 @@ def test_blocking_severities_high() -> None:
 
 
 def test_blocking_severities_medium(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "MEDIUM")
+    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "medium")
     s = Settings()
     assert s.blocking_severities == ["MEDIUM", "HIGH"]
 
 
 def test_blocking_severities_low(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "LOW")
+    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "low")
     s = Settings()
     assert s.blocking_severities == ["LOW", "MEDIUM", "HIGH"]
 

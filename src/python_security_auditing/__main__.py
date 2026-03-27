@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Any
 
 from .pr_comment import upsert_pr_comment
 from .report import build_markdown, check_thresholds, write_step_summary
-from .runners import generate_requirements, run_bandit, run_pip_audit
+from .runners import generate_requirements, read_bandit_sarif, run_pip_audit
 from .settings import Settings
 
 
@@ -18,7 +19,7 @@ def main() -> None:
     pip_audit_report: list[dict[str, Any]] = []
 
     if "bandit" in settings.enabled_tools:
-        bandit_report = run_bandit(settings.scan_directories)
+        bandit_report = read_bandit_sarif(Path(settings.bandit_sarif_path))
 
     if "pip-audit" in settings.enabled_tools:
         requirements_path = generate_requirements(settings)
