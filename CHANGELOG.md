@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.1...v0.3.2) (2026-03-27)
+
+
+### Bug Fixes
+
+* add working directory ([#22](https://github.com/lhoupert/action-python-security-auditing/issues/22)) ([e73b876](https://github.com/lhoupert/action-python-security-auditing/commit/e73b876852e010f5bd4c659c2164d454d0410aff))
+* fix small issues with uv and poetry ([#20](https://github.com/lhoupert/action-python-security-auditing/issues/20)) ([0a4c0e9](https://github.com/lhoupert/action-python-security-auditing/commit/0a4c0e9993d082f1e29ecccb06a4fcdcbec9cbfc))
+
 ## [0.3.1](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.0...v0.3.1) (2026-03-27)
 
 
