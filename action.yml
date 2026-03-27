@@ -34,12 +34,32 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Resolve bandit targets
+      if: contains(inputs.tools, 'bandit')
+      id: resolve-targets
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working_directory }}
+        BANDIT_SCAN_DIRS: ${{ inputs.bandit_scan_dirs }}
+      run: |
+        if [[ "$WORKING_DIRECTORY" == "." ]]; then
+          echo "targets=$BANDIT_SCAN_DIRS" >> "$GITHUB_OUTPUT"
+        else
+          resolved=""
+          IFS=',' read -ra parts <<< "$BANDIT_SCAN_DIRS"
+          for part in "${parts[@]}"; do
+            [[ "$part" == "." ]] && t="$WORKING_DIRECTORY" || t="$WORKING_DIRECTORY/$part"
+            resolved="${resolved:+$resolved,}$t"
+          done
+          echo "targets=$resolved" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Run Bandit (static security analysis)
       if: contains(inputs.tools, 'bandit')
       continue-on-error: true
       uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
       with:
-        targets: ${{ inputs.bandit_scan_dirs }}
+        targets: ${{ steps.resolve-targets.outputs.targets }}
         severity: ${{ inputs.bandit_severity_threshold }}
 
     - name: Set up uv
