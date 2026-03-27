@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.2...v0.4.0) (2026-03-27)
+
+
+### Features
+
+* notify test repo to update action pin ([#24](https://github.com/lhoupert/action-python-security-auditing/issues/24)) ([0168484](https://github.com/lhoupert/action-python-security-auditing/commit/0168484da35bb129ded7f8184144483930ceedaa))
+
 ## [0.3.2](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.1...v0.3.2) (2026-03-27)
 
 
