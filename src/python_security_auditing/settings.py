@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +37,14 @@ class Settings(BaseSettings):
     github_run_id: str = ""
     pr_number: int | None = None
     github_event_name: str = ""
+
+    @field_validator("pr_number", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v: object) -> object:
+        if v == "":
+            return None
+        return v
+
     github_head_ref: str = ""  # Branch name for PRs
     github_step_summary: str = ""  # Path to step summary file
 

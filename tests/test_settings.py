@@ -68,6 +68,12 @@ def test_pr_number_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.pr_number == 42
 
 
+def test_pr_number_empty_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_NUMBER", "")
+    s = Settings()
+    assert s.pr_number is None
+
+
 def test_post_pr_comment_false(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POST_PR_COMMENT", "false")
     s = Settings()
