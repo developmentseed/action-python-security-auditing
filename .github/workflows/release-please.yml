@@ -33,3 +33,16 @@ jobs:
           git tag -fa "v${{ steps.release.outputs.major }}" \
             -m "Release v${{ steps.release.outputs.tag_name }}"
           git push origin "v${{ steps.release.outputs.major }}" --force
+
+      - name: Pin README to release SHA
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          sed -i \
+            's|developmentseed/python-security-auditing@[^ ]*\( # v[0-9][^ ]*\)\?|developmentseed/python-security-auditing@${{ steps.release.outputs.sha }} # ${{ steps.release.outputs.tag_name }}|g' \
+            README.md
+          git add README.md
+          git diff --cached --quiet && echo "README unchanged, skipping commit" && exit 0
+          git commit -m "chore: pin README to ${{ steps.release.outputs.tag_name }} [skip ci]"
+          git push origin HEAD:main
