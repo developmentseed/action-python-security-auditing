@@ -41,14 +41,14 @@ runs:
         targets: ${{ inputs.bandit_scan_dirs }}
         level: ${{ inputs.bandit_severity_threshold }}
 
-    - name: Set up Python
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+    - name: Set up uv
+      uses: astral-sh/setup-uv@d4b2f3b6ecc6e670655d9a3a1e1c89729714b4b7 # v5
       with:
         python-version: '3.13'
 
     - name: Install python-security-auditing
       shell: bash
-      run: pip install "${{ github.action_path }}"
+      run: uv pip install --system "${{ github.action_path }}"
 
     - name: Run security audit
       id: audit
