@@ -119,7 +119,10 @@ def run_pip_audit(requirements_path: Path) -> list[dict[str, Any]]:
 
     raw = result.stdout.strip()
     if raw:
-        parsed: list[dict[str, Any]] = json.loads(raw)
+        parsed: Any = json.loads(raw)
         output_file.write_text(raw)
+        # pip-audit 2.7+ wraps output in {"dependencies": [...], "fixes": [...]}
+        if isinstance(parsed, dict):
+            return parsed.get("dependencies", [])
         return parsed
     return []

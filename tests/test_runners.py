@@ -148,7 +148,9 @@ def test_read_bandit_sarif_falls_back_to_level_mapping(tmp_path: Path) -> None:
 
 def test_run_pip_audit_parses_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    fixture_text = (FIXTURES / "pip_audit_fixable.json").read_text()
+    # pip-audit 2.7+ wraps output in {"dependencies": [...], "fixes": [...]}
+    deps = json.loads((FIXTURES / "pip_audit_fixable.json").read_text())
+    fixture_text = json.dumps({"dependencies": deps, "fixes": []})
 
     with patch("python_security_auditing.runners.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1, stderr="", stdout=fixture_text)
