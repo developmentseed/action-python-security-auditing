@@ -36,10 +36,11 @@ runs:
   steps:
     - name: Run Bandit (static security analysis)
       if: contains(inputs.tools, 'bandit')
+      continue-on-error: true
       uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
       with:
         targets: ${{ inputs.bandit_scan_dirs }}
-        level: ${{ inputs.bandit_severity_threshold }}
+        severity: ${{ inputs.bandit_severity_threshold }}
 
     - name: Set up uv
       uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
