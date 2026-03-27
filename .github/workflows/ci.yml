@@ -59,6 +59,6 @@ jobs:
           persist-credentials: false
       - uses: ./
         with:
-          bandit_scan_dirs: src
+          tools: pip-audit
           package_manager: uv
           post_pr_comment: ${{ github.event_name == 'pull_request' }}
