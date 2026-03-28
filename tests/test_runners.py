@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -191,3 +192,66 @@ def test_run_pip_audit_uses_requirements_path(
     assert str(req_path) in cmd
     assert "-f" in cmd
     assert "json" in cmd
+
+
+def test_run_pip_audit_command_includes_no_deps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="[]")
+        run_pip_audit(Path("requirements.txt"))
+    cmd = mock_run.call_args[0][0]
+    assert "--no-deps" in cmd
+
+
+# ---------------------------------------------------------------------------
+# generate_requirements — missing lockfile handling
+# ---------------------------------------------------------------------------
+
+
+def test_generate_requirements_uv_returns_empty_on_missing_lockfile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PACKAGE_MANAGER", "uv")
+    s = Settings()
+    exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=exc):
+        result = generate_requirements(s)
+    assert result.exists()
+    assert result.stat().st_size == 0
+
+
+def test_generate_requirements_poetry_returns_empty_on_missing_lockfile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PACKAGE_MANAGER", "poetry")
+    s = Settings()
+    exc = subprocess.CalledProcessError(1, "poetry", stderr="poetry.lock not found")
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=exc):
+        result = generate_requirements(s)
+    assert result.exists()
+    assert result.stat().st_size == 0
+
+
+def test_generate_requirements_pipenv_returns_empty_on_missing_lockfile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
+    s = Settings()
+    exc = subprocess.CalledProcessError(1, "pipenv", stderr="Pipfile.lock not found")
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=exc):
+        result = generate_requirements(s)
+    assert result.exists()
+    assert result.stat().st_size == 0
+
+
+def test_generate_requirements_uv_warns_on_missing_lockfile(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PACKAGE_MANAGER", "uv")
+    s = Settings()
+    exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=exc):
+        generate_requirements(s)
+    assert "uv export failed" in capsys.readouterr().err

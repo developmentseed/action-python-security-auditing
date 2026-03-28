@@ -32,12 +32,19 @@ def generate_requirements(settings: Settings) -> Path:
         cmd = ["uv", "export", "--format", "requirements-txt", "--no-hashes", "-o", str(out_path)]
         if settings.debug:
             print(f"[debug] uv export command: {cmd}", file=sys.stderr)
-        subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"uv export failed (no lockfile?): {exc.stderr.strip()}",
+                file=sys.stderr,
+            )
+            return out_path
         if settings.debug:
             print(
                 f"[debug] generated requirements ({out_path}):\n{out_path.read_text()}",
@@ -49,36 +56,50 @@ def generate_requirements(settings: Settings) -> Path:
         if settings.debug:
             print(f"[debug] pip freeze output ({out_path}):\n{result.stdout}", file=sys.stderr)
     elif pm == "poetry":
-        subprocess.run(
-            ["poetry", "self", "add", "poetry-plugin-export"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        subprocess.run(
-            [
-                "poetry",
-                "export",
-                "--format",
-                "requirements.txt",
-                "--without-hashes",
-                "-o",
-                str(out_path),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            subprocess.run(
+                ["poetry", "self", "add", "poetry-plugin-export"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "poetry",
+                    "export",
+                    "--format",
+                    "requirements.txt",
+                    "--without-hashes",
+                    "-o",
+                    str(out_path),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"poetry export failed (no lockfile?): {exc.stderr.strip()}",
+                file=sys.stderr,
+            )
+            return out_path
         if settings.debug:
             print(
                 f"[debug] poetry export output ({out_path}):\n{out_path.read_text()}",
                 file=sys.stderr,
             )
     elif pm == "pipenv":
-        result = subprocess.run(
-            ["pipenv", "requirements"], capture_output=True, text=True, check=True
-        )
-        out_path.write_text(result.stdout)
+        try:
+            result = subprocess.run(
+                ["pipenv", "requirements"], capture_output=True, text=True, check=True
+            )
+            out_path.write_text(result.stdout)
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"pipenv requirements failed (no lockfile?): {exc.stderr.strip()}",
+                file=sys.stderr,
+            )
+            return out_path
         if settings.debug:
             print(
                 f"[debug] pipenv requirements output ({out_path}):\n{result.stdout}",
@@ -135,7 +156,7 @@ def run_pip_audit(
 ) -> list[dict[str, Any]]:
     """Run pip-audit, write pip-audit-report.json, return parsed report."""
     output_file = Path("pip-audit-report.json")
-    cmd = ["pip-audit", "-r", str(requirements_path), "-f", "json"]
+    cmd = ["pip-audit", "-r", str(requirements_path), "--no-deps", "-f", "json"]
 
     if settings and settings.debug:
         print(f"[debug] pip-audit command: {cmd}", file=sys.stderr)
