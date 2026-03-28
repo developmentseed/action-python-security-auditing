@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-* add bandit report to aartifacts ([#27](https://github.com/lhoupert/action-python-security-auditing/issues/27)) ([8180cd7](https://github.com/lhoupert/action-python-security-auditing/commit/8180cd7e7731f985b1a9c8095b5a38bb867ae915))
+* add bandit report to artifacts ([#27](https://github.com/lhoupert/action-python-security-auditing/issues/27)) ([8180cd7](https://github.com/lhoupert/action-python-security-auditing/commit/8180cd7e7731f985b1a9c8095b5a38bb867ae915))
 
 ## [0.4.0](https://github.com/lhoupert/action-python-security-auditing/compare/v0.3.2...v0.4.0) (2026-03-27)
 
