@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/lhoupert/action-python-security-auditing/compare/v0.4.2...v0.4.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* add debug logging and fix bandit multi-target separator ([#36](https://github.com/lhoupert/action-python-security-auditing/issues/36)) ([b0d01ab](https://github.com/lhoupert/action-python-security-auditing/commit/b0d01ab5838a99fe9b2a25503dbb3b01e9c6b5b2))
+
 ## [0.4.2](https://github.com/lhoupert/action-python-security-auditing/compare/v0.4.1...v0.4.2) (2026-03-28)
 
 
