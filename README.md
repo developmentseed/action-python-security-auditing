@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+      - uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
 ```
 
 This runs both bandit and pip-audit with sensible defaults: blocks the job on HIGH-severity code issues and on dependency vulnerabilities that have a fix available.
@@ -85,7 +85,7 @@ This runs both bandit and pip-audit with sensible defaults: blocks the job on HI
 ### uv project
 
 ```yaml
-- uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+- uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
   with:
     package_manager: uv
     bandit_scan_dirs: 'src/'
@@ -96,7 +96,7 @@ This runs both bandit and pip-audit with sensible defaults: blocks the job on HI
 Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities regardless of whether a fix exists:
 
 ```yaml
-- uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+- uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
   with:
     package_manager: poetry
     bandit_severity_threshold: medium
@@ -108,7 +108,7 @@ Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities
 Useful when you manage dependencies externally or run pip-audit in a separate job:
 
 ```yaml
-- uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+- uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
   with:
     tools: bandit
     bandit_scan_dirs: 'src/'
@@ -117,7 +117,7 @@ Useful when you manage dependencies externally or run pip-audit in a separate jo
 ### Project in a subdirectory (monorepo)
 
 ```yaml
-- uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+- uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
   with:
     working_directory: services/api
     package_manager: uv
@@ -129,7 +129,7 @@ Useful when you manage dependencies externally or run pip-audit in a separate jo
 Run the audit and post the comment for visibility, but don't fail CI:
 
 ```yaml
-- uses: developmentseed/python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
+- uses: lhoupert/action-python-security-auditing@db595e9725be5429332e11b7edff7aa6769d5e46 # v0.4.1
   with:
     bandit_severity_threshold: low   # report everything
     pip_audit_block_on: none         # never block
@@ -172,7 +172,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 
 ## Outputs
 
-- **PR comment** — created on first run, updated in place on every subsequent run (keyed on a hidden `<!-- security-scan-results -->` marker).
+- **PR comment** — created on first run, updated in place on every subsequent run. The comment is keyed on a hidden `<!-- security-scan-results::{workflow-name} -->` marker, so multiple workflows on the same PR each maintain their own separate comment.
 - **Step summary** — the same report is written to the workflow run summary, visible under the "Summary" tab.
 - **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps.
 - **Exit code** — non-zero when blocking issues are found, so the job fails and branch protections can enforce it.
@@ -180,7 +180,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-pytest
+uv pip install -e ".[dev]"
+uv run pytest
 pre-commit run --all-files
 ```
