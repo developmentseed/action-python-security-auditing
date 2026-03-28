@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         return v
 
     github_head_ref: str = ""  # Branch name for PRs
+    github_workflow: str = ""  # Name of the running workflow
     github_step_summary: str = ""  # Path to step summary file
 
     @property

@@ -8,7 +8,11 @@ import sys
 
 from .settings import Settings
 
-COMMENT_MARKER = "<!-- security-scan-results -->"
+
+def comment_marker(workflow: str) -> str:
+    if workflow:
+        return f"<!-- security-scan-results::{workflow} -->"
+    return "<!-- security-scan-results -->"
 
 
 def resolve_pr_number(settings: Settings) -> int | None:
@@ -54,7 +58,8 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
         print("No PR found — skipping comment.", file=sys.stderr)
         return
 
-    body = f"{COMMENT_MARKER}\n{markdown}"
+    marker = comment_marker(settings.github_workflow)
+    body = f"{marker}\n{markdown}"
     repo = settings.github_repository
 
     # Find an existing comment with our marker
@@ -66,7 +71,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
     )
     if list_result.returncode == 0:
         for comment in json.loads(list_result.stdout):
-            if COMMENT_MARKER in comment.get("body", ""):
+            if marker in comment.get("body", ""):
                 existing_id = int(comment["id"])
                 break
 

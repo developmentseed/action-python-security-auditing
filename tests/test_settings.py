@@ -90,3 +90,9 @@ def test_github_context(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.github_run_id == "12345"
     assert s.github_event_name == "pull_request"
     assert s.github_head_ref == "feature/my-branch"
+
+
+def test_github_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_WORKFLOW", "CI")
+    s = Settings()
+    assert s.github_workflow == "CI"
