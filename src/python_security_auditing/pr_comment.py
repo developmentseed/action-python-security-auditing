@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 
 from .settings import Settings
+
+
+def _resolve_exe(name: str) -> str:
+    """Resolve an executable name to its full path via PATH, raising if not found."""
+    resolved = shutil.which(name)
+    if resolved is None:
+        raise FileNotFoundError(f"Required tool not found on PATH: {name!r}")
+    return resolved
 
 
 def comment_marker(workflow: str) -> str:
@@ -25,7 +34,7 @@ def resolve_pr_number(settings: Settings) -> int | None:
 
     result = subprocess.run(
         [
-            "gh",
+            _resolve_exe("gh"),
             "pr",
             "list",
             "--head",
@@ -65,7 +74,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
     # Find an existing comment with our marker
     existing_id: int | None = None
     list_result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/issues/{pr_number}/comments"],
+        [_resolve_exe("gh"), "api", f"repos/{repo}/issues/{pr_number}/comments"],
         capture_output=True,
         text=True,
     )
@@ -78,7 +87,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
     if existing_id is not None:
         subprocess.run(
             [
-                "gh",
+                _resolve_exe("gh"),
                 "api",
                 "--method",
                 "PATCH",
@@ -90,6 +99,6 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
         )
     else:
         subprocess.run(
-            ["gh", "pr", "comment", str(pr_number), "--body", body, "--repo", repo],
+            [_resolve_exe("gh"), "pr", "comment", str(pr_number), "--body", body, "--repo", repo],
             check=True,
         )

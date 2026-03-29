@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import field_validator
@@ -59,6 +60,29 @@ class Settings(BaseSettings):
     def _empty_str_to_none(cls, v: object) -> object:
         if v == "":
             return None
+        return v
+
+    @field_validator("bandit_sarif_path", "requirements_file", "github_step_summary", mode="after")
+    @classmethod
+    def _no_path_traversal(cls, v: str) -> str:
+        if v and ".." in Path(v).parts:
+            raise ValueError(f"Path traversal not allowed: {v!r}")
+        return v
+
+    @field_validator("github_repository", mode="after")
+    @classmethod
+    def _validate_repository_format(cls, v: str) -> str:
+        if not v:
+            return v
+        if ".." in v or v.startswith("/") or v.count("/") != 1:
+            raise ValueError(f"github_repository must be 'owner/repo' format, got: {v!r}")
+        return v
+
+    @field_validator("github_run_id", mode="after")
+    @classmethod
+    def _validate_run_id(cls, v: str) -> str:
+        if v and not v.isdigit():
+            raise ValueError(f"github_run_id must be numeric, got: {v!r}")
         return v
 
     github_head_ref: str = ""  # Branch name for PRs

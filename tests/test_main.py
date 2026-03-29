@@ -30,7 +30,10 @@ def test_main_succeeds_when_uv_lockfile_missing_and_no_bandit_issues(
             raise uv_exc
         return MagicMock(returncode=0, stderr="", stdout="[]")
 
-    with patch("python_security_auditing.runners.subprocess.run", side_effect=mock_subprocess):
+    with (
+        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
+        patch("python_security_auditing.runners.subprocess.run", side_effect=mock_subprocess),
+    ):
         main()  # should return normally without calling sys.exit(1)
 
 
@@ -53,7 +56,10 @@ def test_main_fails_when_bandit_blocks_despite_missing_lockfile(
             raise uv_exc
         return MagicMock(returncode=0, stderr="", stdout="[]")
 
-    with patch("python_security_auditing.runners.subprocess.run", side_effect=mock_subprocess):
+    with (
+        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
+        patch("python_security_auditing.runners.subprocess.run", side_effect=mock_subprocess),
+    ):
         with pytest.raises(SystemExit) as exc_info:
             main()
     assert exc_info.value.code == 1

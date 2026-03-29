@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from .settings import Settings
+
+
+def _resolve_exe(name: str) -> str:
+    """Resolve an executable name to its full path via PATH, raising if not found."""
+    resolved = shutil.which(name)
+    if resolved is None:
+        raise FileNotFoundError(f"Required tool not found on PATH: {name!r}")
+    return resolved
 
 
 def generate_requirements(settings: Settings) -> Path:
@@ -29,7 +38,15 @@ def generate_requirements(settings: Settings) -> Path:
     out_path = Path(tmp.name)
 
     if pm == "uv":
-        cmd = ["uv", "export", "--format", "requirements-txt", "--no-hashes", "-o", str(out_path)]
+        cmd = [
+            _resolve_exe("uv"),
+            "export",
+            "--format",
+            "requirements-txt",
+            "--no-hashes",
+            "-o",
+            str(out_path),
+        ]
         if settings.debug:
             print(f"[debug] uv export command: {cmd}", file=sys.stderr)
         try:
@@ -51,14 +68,16 @@ def generate_requirements(settings: Settings) -> Path:
                 file=sys.stderr,
             )
     elif pm == "pip":
-        result = subprocess.run(["pip", "freeze"], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            [_resolve_exe("pip"), "freeze"], capture_output=True, text=True, check=True
+        )
         out_path.write_text(result.stdout)
         if settings.debug:
             print(f"[debug] pip freeze output ({out_path}):\n{result.stdout}", file=sys.stderr)
     elif pm == "poetry":
         # poetry-plugin-export is bundled in Poetry 1.8+; ignore failure here
         subprocess.run(
-            ["poetry", "self", "add", "poetry-plugin-export"],
+            [_resolve_exe("poetry"), "self", "add", "poetry-plugin-export"],
             check=False,
             capture_output=True,
             text=True,
@@ -66,7 +85,7 @@ def generate_requirements(settings: Settings) -> Path:
         try:
             subprocess.run(
                 [
-                    "poetry",
+                    _resolve_exe("poetry"),
                     "export",
                     "--format",
                     "requirements.txt",
@@ -92,7 +111,7 @@ def generate_requirements(settings: Settings) -> Path:
     elif pm == "pipenv":
         try:
             result = subprocess.run(
-                ["pipenv", "requirements"], capture_output=True, text=True, check=True
+                [_resolve_exe("pipenv"), "requirements"], capture_output=True, text=True, check=True
             )
             out_path.write_text(result.stdout)
         except subprocess.CalledProcessError as exc:
@@ -157,7 +176,7 @@ def run_pip_audit(
 ) -> list[dict[str, Any]]:
     """Run pip-audit, write pip-audit-report.json, return parsed report."""
     output_file = Path("pip-audit-report.json")
-    cmd = ["pip-audit", "-r", str(requirements_path), "--no-deps", "-f", "json"]
+    cmd = [_resolve_exe("pip-audit"), "-r", str(requirements_path), "--no-deps", "-f", "json"]
 
     if settings and settings.debug:
         print(f"[debug] pip-audit command: {cmd}", file=sys.stderr)

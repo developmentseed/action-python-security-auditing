@@ -64,10 +64,13 @@ def test_upsert_creates_new_comment(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings()
 
     list_response = MagicMock(returncode=0, stdout=json.dumps([]))
-    with patch(
-        "python_security_auditing.pr_comment.subprocess.run",
-        side_effect=[list_response, MagicMock()],
-    ) as mock_run:
+    with (
+        patch("python_security_auditing.pr_comment.shutil.which", side_effect=lambda exe: exe),
+        patch(
+            "python_security_auditing.pr_comment.subprocess.run",
+            side_effect=[list_response, MagicMock()],
+        ) as mock_run,
+    ):
         upsert_pr_comment("# Report", s)
 
         create_call = mock_run.call_args_list[1]
@@ -87,10 +90,13 @@ def test_upsert_updates_existing_comment(monkeypatch: pytest.MonkeyPatch) -> Non
 
     existing = [{"id": 99, "body": "<!-- security-scan-results::my-workflow -->\nold"}]
     list_response = MagicMock(returncode=0, stdout=json.dumps(existing))
-    with patch(
-        "python_security_auditing.pr_comment.subprocess.run",
-        side_effect=[list_response, MagicMock()],
-    ) as mock_run:
+    with (
+        patch("python_security_auditing.pr_comment.shutil.which", side_effect=lambda exe: exe),
+        patch(
+            "python_security_auditing.pr_comment.subprocess.run",
+            side_effect=[list_response, MagicMock()],
+        ) as mock_run,
+    ):
         upsert_pr_comment("# Report", s)
 
         patch_call = mock_run.call_args_list[1]
@@ -110,13 +116,27 @@ def test_upsert_does_not_match_different_workflow(monkeypatch: pytest.MonkeyPatc
 
     other_workflow_comment = [{"id": 99, "body": "<!-- security-scan-results::workflow-b -->\nold"}]
     list_response = MagicMock(returncode=0, stdout=json.dumps(other_workflow_comment))
-    with patch(
-        "python_security_auditing.pr_comment.subprocess.run",
-        side_effect=[list_response, MagicMock()],
-    ) as mock_run:
+    with (
+        patch("python_security_auditing.pr_comment.shutil.which", side_effect=lambda exe: exe),
+        patch(
+            "python_security_auditing.pr_comment.subprocess.run",
+            side_effect=[list_response, MagicMock()],
+        ) as mock_run,
+    ):
         upsert_pr_comment("# Report", s)
 
         # Must create a new comment, not PATCH the existing one
         create_call = mock_run.call_args_list[1]
         cmd: list[str] = create_call[0][0]
         assert cmd[:3] == ["gh", "pr", "comment"]
+
+
+def test_upsert_raises_when_gh_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POST_PR_COMMENT", "true")
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
+    monkeypatch.setenv("PR_NUMBER", "42")
+    s = Settings()
+    with patch("python_security_auditing.pr_comment.shutil.which", return_value=None):
+        with pytest.raises(FileNotFoundError, match="gh"):
+            upsert_pr_comment("# Report", s)

@@ -1,6 +1,7 @@
 """Tests for settings.py — env var parsing and computed properties."""
 
 import pytest
+from pydantic import ValidationError
 from python_security_auditing.settings import Settings
 
 
@@ -96,3 +97,76 @@ def test_github_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GITHUB_WORKFLOW", "CI")
     s = Settings()
     assert s.github_workflow == "CI"
+
+
+# ---------------------------------------------------------------------------
+# Path traversal validation
+# ---------------------------------------------------------------------------
+
+
+def test_bandit_sarif_path_rejects_traversal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BANDIT_SARIF_PATH", "../etc/passwd")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_requirements_file_rejects_traversal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REQUIREMENTS_FILE", "../../etc/shadow")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_github_step_summary_rejects_traversal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", "/tmp/../../etc/hosts")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+# ---------------------------------------------------------------------------
+# github_repository format validation
+# ---------------------------------------------------------------------------
+
+
+def test_github_repository_accepts_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "my-org/my-repo")
+    s = Settings()
+    assert s.github_repository == "my-org/my-repo"
+
+
+def test_github_repository_rejects_traversal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "../../secret-org/secret-repo")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_github_repository_rejects_extra_slashes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo/extra")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_github_repository_empty_is_allowed() -> None:
+    s = Settings()
+    assert s.github_repository == ""
+
+
+# ---------------------------------------------------------------------------
+# github_run_id numeric validation
+# ---------------------------------------------------------------------------
+
+
+def test_github_run_id_accepts_numeric(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_RUN_ID", "12345678")
+    s = Settings()
+    assert s.github_run_id == "12345678"
+
+
+def test_github_run_id_rejects_non_numeric(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_RUN_ID", "123; rm -rf /")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_github_run_id_empty_is_allowed() -> None:
+    s = Settings()
+    assert s.github_run_id == ""
