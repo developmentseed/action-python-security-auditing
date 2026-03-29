@@ -145,7 +145,8 @@ def test_github_repository_rejects_extra_slashes(monkeypatch: pytest.MonkeyPatch
         Settings()
 
 
-def test_github_repository_empty_is_allowed() -> None:
+def test_github_repository_empty_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_REPOSITORY", "")
     s = Settings()
     assert s.github_repository == ""
 
@@ -167,7 +168,8 @@ def test_github_run_id_rejects_non_numeric(monkeypatch: pytest.MonkeyPatch) -> N
         Settings()
 
 
-def test_github_run_id_empty_is_allowed() -> None:
+def test_github_run_id_empty_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_RUN_ID", "")
     s = Settings()
     assert s.github_run_id == ""
 
@@ -183,7 +185,8 @@ def test_github_head_ref_accepts_dependabot_branch(monkeypatch: pytest.MonkeyPat
     assert s.github_head_ref == "dependabot/pip/requests-2.32.0"
 
 
-def test_github_head_ref_empty_is_allowed() -> None:
+def test_github_head_ref_empty_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_HEAD_REF", "")
     s = Settings()
     assert s.github_head_ref == ""
 
