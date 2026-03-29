@@ -56,13 +56,14 @@ def generate_requirements(settings: Settings) -> Path:
         if settings.debug:
             print(f"[debug] pip freeze output ({out_path}):\n{result.stdout}", file=sys.stderr)
     elif pm == "poetry":
+        # poetry-plugin-export is bundled in Poetry 1.8+; ignore failure here
+        subprocess.run(
+            ["poetry", "self", "add", "poetry-plugin-export"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
         try:
-            subprocess.run(
-                ["poetry", "self", "add", "poetry-plugin-export"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
             subprocess.run(
                 [
                     "poetry",

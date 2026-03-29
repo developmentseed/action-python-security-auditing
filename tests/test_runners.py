@@ -227,8 +227,11 @@ def test_generate_requirements_poetry_returns_empty_on_missing_lockfile(
 ) -> None:
     monkeypatch.setenv("PACKAGE_MANAGER", "poetry")
     s = Settings()
-    exc = subprocess.CalledProcessError(1, "poetry", stderr="poetry.lock not found")
-    with patch("python_security_auditing.runners.subprocess.run", side_effect=exc):
+    export_exc = subprocess.CalledProcessError(1, "poetry", stderr="poetry.lock not found")
+    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
+        # self add uses check=False so a non-zero return is silently ignored;
+        # export raises CalledProcessError to simulate a missing lockfile
+        mock_run.side_effect = [MagicMock(returncode=1), export_exc]
         result = generate_requirements(s)
     assert result.exists()
     assert result.stat().st_size == 0
