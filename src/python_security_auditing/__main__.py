@@ -16,7 +16,7 @@ def main() -> None:
     settings = Settings()
 
     if settings.debug:
-        print(f"[debug] settings: {settings.model_dump()}", file=sys.stderr)
+        print(f"[debug] settings: {settings.model_dump(exclude={'github_token'})}", file=sys.stderr)
 
     bandit_report: dict[str, Any] = {}
     pip_audit_report: list[dict[str, Any]] = []
