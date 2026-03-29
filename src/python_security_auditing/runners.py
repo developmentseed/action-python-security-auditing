@@ -50,7 +50,7 @@ def generate_requirements(settings: Settings) -> Path:
         if settings.debug:
             print(f"[debug] uv export command: {cmd}", file=sys.stderr)
         try:
-            subprocess.run(
+            subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
                 cmd,
                 check=True,
                 capture_output=True,
@@ -68,7 +68,7 @@ def generate_requirements(settings: Settings) -> Path:
                 file=sys.stderr,
             )
     elif pm == "pip":
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
             [_resolve_exe("pip"), "freeze"], capture_output=True, text=True, check=True
         )
         out_path.write_text(result.stdout)
@@ -76,14 +76,14 @@ def generate_requirements(settings: Settings) -> Path:
             print(f"[debug] pip freeze output ({out_path}):\n{result.stdout}", file=sys.stderr)
     elif pm == "poetry":
         # poetry-plugin-export is bundled in Poetry 1.8+; ignore failure here
-        subprocess.run(
+        subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
             [_resolve_exe("poetry"), "self", "add", "poetry-plugin-export"],
             check=False,
             capture_output=True,
             text=True,
         )
         try:
-            subprocess.run(
+            subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
                 [
                     _resolve_exe("poetry"),
                     "export",
@@ -110,7 +110,7 @@ def generate_requirements(settings: Settings) -> Path:
             )
     elif pm == "pipenv":
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
                 [_resolve_exe("pipenv"), "requirements"], capture_output=True, text=True, check=True
             )
             out_path.write_text(result.stdout)
@@ -181,7 +181,7 @@ def run_pip_audit(
     if settings and settings.debug:
         print(f"[debug] pip-audit command: {cmd}", file=sys.stderr)
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603,B605 -- list args, full path via _resolve_exe()
     # pip-audit exits 1 when vulnerabilities are found — that is expected
     if result.returncode not in (0, 1):
         print(

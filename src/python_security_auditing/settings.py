@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -86,6 +87,16 @@ class Settings(BaseSettings):
         return v
 
     github_head_ref: str = ""  # Branch name for PRs
+
+    @field_validator("github_head_ref", mode="after")
+    @classmethod
+    def _validate_head_ref(cls, v: str) -> str:
+        if v and not re.fullmatch(r"[a-zA-Z0-9._/\-]+", v):
+            raise ValueError(
+                f"github_head_ref contains invalid characters for a branch name: {v!r}"
+            )
+        return v
+
     github_workflow: str = ""  # Name of the running workflow
     github_step_summary: str = ""  # Path to step summary file
 

@@ -32,7 +32,7 @@ def resolve_pr_number(settings: Settings) -> int | None:
     if not settings.github_head_ref or not settings.github_repository:
         return None
 
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
         [
             _resolve_exe("gh"),
             "pr",
@@ -73,7 +73,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
 
     # Find an existing comment with our marker
     existing_id: int | None = None
-    list_result = subprocess.run(
+    list_result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
         [_resolve_exe("gh"), "api", f"repos/{repo}/issues/{pr_number}/comments"],
         capture_output=True,
         text=True,
@@ -85,7 +85,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
                 break
 
     if existing_id is not None:
-        subprocess.run(
+        subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
             [
                 _resolve_exe("gh"),
                 "api",
@@ -98,7 +98,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
             check=True,
         )
     else:
-        subprocess.run(
+        subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
             [_resolve_exe("gh"), "pr", "comment", str(pr_number), "--body", body, "--repo", repo],
             check=True,
         )

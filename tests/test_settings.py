@@ -170,3 +170,31 @@ def test_github_run_id_rejects_non_numeric(monkeypatch: pytest.MonkeyPatch) -> N
 def test_github_run_id_empty_is_allowed() -> None:
     s = Settings()
     assert s.github_run_id == ""
+
+
+# ---------------------------------------------------------------------------
+# github_head_ref branch name validation
+# ---------------------------------------------------------------------------
+
+
+def test_github_head_ref_accepts_dependabot_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_HEAD_REF", "dependabot/pip/requests-2.32.0")
+    s = Settings()
+    assert s.github_head_ref == "dependabot/pip/requests-2.32.0"
+
+
+def test_github_head_ref_empty_is_allowed() -> None:
+    s = Settings()
+    assert s.github_head_ref == ""
+
+
+def test_github_head_ref_rejects_semicolon(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_HEAD_REF", "main; rm -rf /")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_github_head_ref_rejects_newline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_HEAD_REF", "feature/branch\ninjected")
+    with pytest.raises(ValidationError):
+        Settings()
