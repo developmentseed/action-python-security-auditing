@@ -21,9 +21,9 @@ inputs:
   requirements_file:
     description: Path to requirements file when package_manager=requirements
     default: requirements.txt
-  post_pr_comment:
-    description: Post or update a PR comment with the scan results
-    default: 'true'
+  comment_on:
+    description: When to post a PR comment — never, blocking (only when issues block the job), or always
+    default: 'never'
   github_token:
     description: GitHub token used for posting PR comments
     default: ${{ github.token }}
@@ -84,7 +84,7 @@ runs:
         PIP_AUDIT_BLOCK_ON: ${{ inputs.pip_audit_block_on }}
         PACKAGE_MANAGER: ${{ inputs.package_manager }}
         REQUIREMENTS_FILE: ${{ inputs.requirements_file }}
-        POST_PR_COMMENT: ${{ inputs.post_pr_comment }}
+        COMMENT_ON: ${{ inputs.comment_on }}
         GITHUB_TOKEN: ${{ inputs.github_token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         INPUT_DEBUG: ${{ inputs.debug }}

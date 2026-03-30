@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     requirements_file: str = "requirements.txt"
 
     # PR comment config
-    post_pr_comment: bool = True
+    comment_on: Literal["never", "blocking", "always"] = "never"
     github_token: str = ""
 
     # GitHub context (standard env vars set by GitHub Actions)

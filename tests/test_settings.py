@@ -13,7 +13,7 @@ def test_defaults() -> None:
     assert s.pip_audit_block_on == "fixable"
     assert s.package_manager == "requirements"
     assert s.requirements_file == "requirements.txt"
-    assert s.post_pr_comment is True
+    assert s.comment_on == "never"
     assert s.github_token == ""
 
 
@@ -75,10 +75,16 @@ def test_pr_number_empty_string(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.pr_number is None
 
 
-def test_post_pr_comment_false(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "false")
+def test_comment_on_blocking(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMMENT_ON", "blocking")
     s = Settings()
-    assert s.post_pr_comment is False
+    assert s.comment_on == "blocking"
+
+
+def test_comment_on_always(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMMENT_ON", "always")
+    s = Settings()
+    assert s.comment_on == "always"
 
 
 def test_github_context(monkeypatch: pytest.MonkeyPatch) -> None:

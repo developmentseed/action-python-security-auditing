@@ -32,17 +32,7 @@ def test_comment_marker_backward_compat() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_upsert_skips_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "false")
-    monkeypatch.setenv("GITHUB_TOKEN", "tok")
-    s = Settings()
-    with patch("python_security_auditing.pr_comment.subprocess.run") as mock_run:
-        upsert_pr_comment("# Report", s)
-        mock_run.assert_not_called()
-
-
 def test_upsert_skips_when_no_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "true")
     monkeypatch.setenv("GITHUB_TOKEN", "")
     s = Settings()
     with patch("python_security_auditing.pr_comment.subprocess.run") as mock_run:
@@ -56,7 +46,6 @@ def test_upsert_skips_when_no_token(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_upsert_creates_new_comment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "true")
     monkeypatch.setenv("GITHUB_TOKEN", "tok")
     monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
     monkeypatch.setenv("PR_NUMBER", "42")
@@ -81,7 +70,6 @@ def test_upsert_creates_new_comment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_upsert_updates_existing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "true")
     monkeypatch.setenv("GITHUB_TOKEN", "tok")
     monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
     monkeypatch.setenv("PR_NUMBER", "42")
@@ -107,7 +95,6 @@ def test_upsert_updates_existing_comment(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_upsert_does_not_match_different_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     """A comment from workflow-b must not be reused by workflow-a."""
-    monkeypatch.setenv("POST_PR_COMMENT", "true")
     monkeypatch.setenv("GITHUB_TOKEN", "tok")
     monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
     monkeypatch.setenv("PR_NUMBER", "42")
@@ -132,7 +119,6 @@ def test_upsert_does_not_match_different_workflow(monkeypatch: pytest.MonkeyPatc
 
 
 def test_upsert_raises_when_gh_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("POST_PR_COMMENT", "true")
     monkeypatch.setenv("GITHUB_TOKEN", "tok")
     monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
     monkeypatch.setenv("PR_NUMBER", "42")

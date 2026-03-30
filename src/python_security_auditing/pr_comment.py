@@ -59,7 +59,7 @@ def upsert_pr_comment(markdown: str, settings: Settings) -> None:
 
     Skips silently if no PR is found or if posting is disabled.
     """
-    if not settings.post_pr_comment or not settings.github_token:
+    if not settings.github_token:
         return
 
     pr_number = resolve_pr_number(settings)
