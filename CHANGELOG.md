@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/developmentseed/action-python-security-auditing/compare/v0.5.0...v0.6.0) (2026-03-30)
+
+
+### Features
+
+* transfer ownership ([#51](https://github.com/developmentseed/action-python-security-auditing/issues/51)) ([09a3ca2](https://github.com/developmentseed/action-python-security-auditing/commit/09a3ca285135806e0a854628d15ba93344fa82d9))
+
+
+### Bug Fixes
+
+* use annotation instead of pr comments ([#53](https://github.com/developmentseed/action-python-security-auditing/issues/53)) ([9c59cb4](https://github.com/developmentseed/action-python-security-auditing/commit/9c59cb4bedaaa892d7a90b56916f9b61f7d59fe4))
+
 ## [0.5.0](https://github.com/developmentseed/action-python-security-auditing/compare/v0.4.3...v0.5.0) (2026-03-30)
 
 
