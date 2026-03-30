@@ -1,6 +1,6 @@
 # python-security-auditing
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lhoupert/action-python-security-auditing/badge)](https://scorecard.dev/viewer/?uri=github.com/lhoupert/action-python-security-auditing)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/developmentseed/action-python-security-auditing/badge)](https://scorecard.dev/viewer/?uri=github.com/developmentseed/action-python-security-auditing)
 
 A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on a Python repository, then puts the results in one PR comment, the workflow step summary, and a downloadable artifact.
 
@@ -59,7 +59,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+      - uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
         with:
           package_manager: uv        # export handled automatically
           bandit_scan_dirs: 'src/'
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+      - uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
 ```
 
 This runs both bandit and pip-audit with sensible defaults: blocks the job on HIGH-severity code issues and on dependency vulnerabilities that have a fix available.
@@ -155,7 +155,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **uv:**
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: uv
     bandit_scan_dirs: 'src/'
@@ -163,7 +163,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Poetry:**
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: poetry
     bandit_scan_dirs: 'src/'
@@ -171,7 +171,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Pipenv:**
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: pipenv
     bandit_scan_dirs: 'src/'
@@ -179,7 +179,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Plain requirements file (default):**
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     requirements_file: requirements/prod.txt
     bandit_scan_dirs: 'src/'
@@ -190,7 +190,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 When your source code spans more than one directory, pass a comma-separated list to `bandit_scan_dirs`:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: uv
     bandit_scan_dirs: 'src/,scripts/'
@@ -201,7 +201,7 @@ When your source code spans more than one directory, pass a comma-separated list
 Set `working_directory` to the project root within the repo. All relative paths (scan dirs, requirements file) are resolved from there:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     working_directory: services/api
     package_manager: uv
@@ -213,7 +213,7 @@ Set `working_directory` to the project root within the repo. All relative paths 
 Useful when you manage dependencies externally or run pip-audit in a separate job:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     tools: bandit
     bandit_scan_dirs: 'src/'
@@ -224,7 +224,7 @@ Useful when you manage dependencies externally or run pip-audit in a separate jo
 Useful when you already run bandit separately or only care about known CVEs in dependencies:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     tools: pip-audit
     package_manager: uv
@@ -235,7 +235,7 @@ Useful when you already run bandit separately or only care about known CVEs in d
 Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities regardless of whether a fix exists. Suitable for high-assurance services or regulated environments:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: poetry
     bandit_severity_threshold: medium
@@ -247,7 +247,7 @@ Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities
 Add the action first as an observer: it posts findings to the PR comment and step summary without ever failing the job. Tighten the thresholds once your team has addressed the backlog:
 
 ```yaml
-- uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+- uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
   with:
     package_manager: uv
     bandit_severity_threshold: low   # report everything
@@ -275,7 +275,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+      - uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
         with:
           package_manager: uv
           post_pr_comment: false   # no PR to comment on for scheduled runs
