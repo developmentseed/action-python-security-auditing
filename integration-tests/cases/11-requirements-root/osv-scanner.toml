@@ -1,0 +1,3 @@
+[[PackageOverrides]]
+ignore = true
+reason = "Synthetic fixture for python-security-auditing integration tests; vulnerable pins are intentional to exercise pip-audit and the composite action."
