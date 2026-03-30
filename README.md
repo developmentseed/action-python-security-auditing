@@ -2,7 +2,7 @@
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/developmentseed/action-python-security-auditing/badge)](https://scorecard.dev/viewer/?uri=github.com/developmentseed/action-python-security-auditing)
 
-A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on a Python repository, then puts the results in one PR comment, the workflow step summary, and a downloadable artifact.
+A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static code analysis) and **[pip-audit](https://pypi.org/project/pip-audit/)** (dependency vulnerability scanning) on a Python repository, then surfaces findings as inline PR annotations, a workflow step summary, and a downloadable artifact.
 
 ## When this might be useful
 
@@ -11,8 +11,9 @@ Running bandit and pip-audit directly — or using the official focused actions 
 This action exists for workflows where you want **both** scanners behind **one** step and **one** place to read the outcome. It is a thin wrapper around the same tools, not a different kind of analysis. The things it adds on top of running the tools individually:
 
 - **Single step, unified report** — one action replaces two, with no need to coordinate SARIF uploads or chain step outputs between jobs.
-- **One PR comment for both scanners** — created on the first run and updated in place on every subsequent push, so the PR thread stays clean. Neither official action provides this out of the box.
-- **Workflow step summary** — the same report is written to the "Summary" tab of the workflow run.
+- **Inline PR annotations** — bandit findings appear as inline annotations on the "Files changed" tab, pointing directly to the affected file and line. pip-audit findings appear as summary-level annotations. Annotations generate no email notifications, so they don't add to developer fatigue on active PRs.
+- **Workflow step summary** — the full report is written to the "Summary" tab of the workflow run.
+- **Optional PR comment** — set `comment_on: blocking` or `comment_on: always` to post a unified PR comment as well. The comment is created once and updated in place on every push, so the PR thread stays clean. Disabled by default to avoid notification noise.
 - **Block on fixable-only vulnerabilities** — `pip_audit_block_on: fixable` (the default) fails CI only when a patched version exists, so you can act on it immediately; unfixable CVEs are reported but don't block. The official pip-audit action does not have this mode.
 - **Automatic requirements export** — pass `package_manager: uv|poetry|pipenv` and the action runs the appropriate export command before invoking pip-audit. With the official pip-audit action, you must add a separate step to export first.
 
@@ -44,7 +45,7 @@ jobs:
         with:
           inputs: requirements.txt
           # Note: no built-in "fixable-only" blocking mode
-          # Note: findings appear only in the Actions log — no PR comment
+          # Note: no unified report, no inline PR annotations
 ```
 
 **Using this action (equivalent result, one step):**
@@ -55,7 +56,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write   # for the unified PR comment
       security-events: write
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +64,35 @@ jobs:
           package_manager: uv        # export handled automatically
           bandit_scan_dirs: 'src/'
           pip_audit_block_on: fixable  # only block when a fix exists
-          # Posts a unified PR comment and step summary automatically
+          # Inline PR annotations and step summary are written automatically
 ```
 
-## What the PR comment looks like
+## Feedback channels
 
-When issues are found, the comment posted to the PR looks like this:
+### Inline annotations (default — no email notifications)
+
+Bandit findings are emitted as inline workflow annotations that appear directly on the affected file and line in the PR "Files changed" tab:
+
+```
+::error file=src/app.py,line=2::[B404] Consider possible security implications associated with subprocess module.
+::warning file=src/app.py,line=5::[B602] subprocess call with shell=True identified, security issue.
+```
+
+pip-audit findings appear as summary-level annotations (no file/line available):
+
+```
+::warning::pip-audit: requests@2.25.0 — GHSA-j8r2-6x86-q33q (fix: 2.31.0)
+```
+
+Annotation severity maps to bandit severity: HIGH → error, MEDIUM → warning, LOW → notice. Annotations are always emitted and generate no email notifications.
+
+### Step summary (default)
+
+The full report is written to the workflow run "Summary" tab on every run.
+
+### PR comment (opt-in via `comment_on`)
+
+Set `comment_on: blocking` or `comment_on: always` to also post a PR comment. When issues are found, the comment looks like this:
 
 ```
 # Security Audit Report
@@ -95,22 +118,7 @@ _1 vulnerability/vulnerabilities found (1 fixable) across 1 package(s)._
 **Result: ❌ Blocking issues found — see details above.**
 ```
 
-When everything is clean:
-
-```
-## Bandit — Static Security Analysis
-✅ No issues found.
-
-## pip-audit — Dependency Vulnerabilities
-✅ No vulnerabilities found.
-
----
-**Result: ✅ No blocking issues found.**
-```
-
-The comment is idempotent — it is created once and updated in place on every push, so the PR thread stays clean.
-
-Each section also includes a direct link: the Bandit section links to the repository's GitHub Code Scanning page, and the pip-audit section links to the Dependabot security alerts page. These links appear when GitHub repository context is available (i.e. when running inside a GitHub Actions workflow).
+The comment is idempotent — created once and updated in place on every push, so the PR thread stays clean. Each section includes a direct link to the repository's GitHub Code Scanning page (Bandit) and Dependabot security alerts page (pip-audit).
 
 ## Quickstart
 
@@ -136,16 +144,24 @@ This runs both bandit and pip-audit with sensible defaults: blocks the job on HI
 
 ## Required permissions
 
-The action needs these permissions on the job:
+The default configuration (annotations + step summary, no PR comment) only needs:
 
 ```yaml
 permissions:
   contents: read
-  pull-requests: write   # post/update the PR comment (when post_pr_comment: true)
-  security-events: write # upload bandit SARIF to GitHub Code Scanning
+  security-events: write  # upload bandit SARIF to GitHub Code Scanning
 ```
 
-If you only use `post_pr_comment: false` and don't care about Code Scanning integration, `contents: read` alone is sufficient.
+When `comment_on` is set to `blocking` or `always`, add:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write    # post/update the PR comment
+  security-events: write
+```
+
+If you don't need Code Scanning integration, `contents: read` alone is sufficient.
 
 ## Usage examples
 
@@ -244,7 +260,7 @@ Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities
 
 ### Gradual adoption (audit-only, never block)
 
-Add the action first as an observer: it posts findings to the PR comment and step summary without ever failing the job. Tighten the thresholds once your team has addressed the backlog:
+Add the action first as an observer: findings appear as inline annotations and in the step summary without ever failing the job. Tighten the thresholds once your team has addressed the backlog:
 
 ```yaml
 - uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
@@ -252,6 +268,7 @@ Add the action first as an observer: it posts findings to the PR comment and ste
     package_manager: uv
     bandit_severity_threshold: low   # report everything
     pip_audit_block_on: none         # never block
+    comment_on: always               # optionally post findings to the PR comment too
 ```
 
 ### Scheduled scan on the default branch
@@ -278,12 +295,12 @@ jobs:
       - uses: developmentseed/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
         with:
           package_manager: uv
-          post_pr_comment: false   # no PR to comment on for scheduled runs
+          # comment_on defaults to never — no PR comment is posted for scheduled runs
 ```
 
 ### Multiple workflows posting separate PR comments
 
-If you run this action from more than one workflow on the same PR (e.g. a general security workflow and a focused API service workflow), each workflow automatically gets its own PR comment. No configuration is needed — the comment is keyed on the workflow name, so the two comments stay independent and update in place separately.
+If you run this action from more than one workflow on the same PR with `comment_on: blocking` or `comment_on: always`, each workflow automatically gets its own PR comment. No extra configuration is needed — the comment is keyed on the workflow name, so the two comments stay independent and update in place separately.
 
 ## How blocking works
 
@@ -316,15 +333,16 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 | `package_manager` | `requirements` | How to resolve deps for pip-audit: `uv`, `pip`, `poetry`, `pipenv`, `requirements` |
 | `requirements_file` | `requirements.txt` | Path to requirements file when `package_manager=requirements` |
 | `working_directory` | `.` | Directory to run the audit from (useful for monorepos) |
-| `post_pr_comment` | `true` | Post/update a PR comment with scan results |
-| `github_token` | `${{ github.token }}` | Token used for posting PR comments |
+| `comment_on` | `never` | When to post a PR comment: `never`, `blocking` (only when issues block the job), or `always` |
+| `github_token` | `${{ github.token }}` | Token used for posting PR comments (only needed when `comment_on` is not `never`) |
 | `artifact_name` | `security-audit-reports` | Name of the uploaded artifact |
 | `debug` | `false` | Enable verbose debug logging; also activates automatically when re-running a workflow with "Enable debug logging" |
 
 ## Outputs
 
-- **PR comment** — created on first run, updated in place on every subsequent run. The comment is keyed on a hidden `<!-- security-scan-results::{workflow-name} -->` marker, so multiple workflows on the same PR each maintain their own separate comment.
-- **Step summary** — the same report is written to the workflow run summary, visible under the "Summary" tab.
+- **Annotations** — always emitted. Bandit findings appear as inline annotations on the PR "Files changed" tab (keyed to file and line). pip-audit findings appear as summary-level annotations. No email notifications are generated.
+- **Step summary** — the full report is written to the workflow run summary, visible under the "Summary" tab.
+- **PR comment** — opt-in via `comment_on: blocking` or `comment_on: always`. Created on first run, updated in place on every subsequent run. The comment is keyed on a hidden `<!-- security-scan-results::{workflow-name} -->` marker, so multiple workflows on the same PR each maintain their own separate comment.
 - **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps. The `results.sarif` file is the bandit SARIF report; it is also uploaded to GitHub Code Scanning automatically by the underlying `lhoupert/bandit-action` step, making findings visible in the repository's Security tab when the job has `security-events: write` permission.
 - **Exit code** — non-zero when blocking issues are found, so the job fails and branch protections can enforce it.
 
