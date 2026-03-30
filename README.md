@@ -6,14 +6,66 @@ A GitHub Action that runs **[bandit](https://bandit.readthedocs.io/)** (static c
 
 ## When this might be useful
 
-Running bandit and pip-audit directly—or using focused actions like `PyCQA/bandit-action` or `pypa/gh-action-pip-audit`—is a reasonable and common approach. Those tools and actions are fine on their own.
+Running bandit and pip-audit directly — or using the official focused actions ([PyCQA/bandit-action](https://github.com/PyCQA/bandit-action) and [pypa/gh-action-pip-audit](https://github.com/pypa/gh-action-pip-audit)) — is a reasonable and common approach. Those tools and actions are fine on their own.
 
-This repo exists for workflows where you want **both** scanners behind **one** job and **one** place to read the outcome. It is a thin wrapper around the same tools, not a different kind of analysis. The things it adds on top of running the tools individually:
+This action exists for workflows where you want **both** scanners behind **one** step and **one** place to read the outcome. It is a thin wrapper around the same tools, not a different kind of analysis. The things it adds on top of running the tools individually:
 
-- **One PR comment for both scanners** — created on the first run and updated in place on every subsequent push, so the PR thread stays clean.
+- **Single step, unified report** — one action replaces two, with no need to coordinate SARIF uploads or chain step outputs between jobs.
+- **One PR comment for both scanners** — created on the first run and updated in place on every subsequent push, so the PR thread stays clean. Neither official action provides this out of the box.
 - **Workflow step summary** — the same report is written to the "Summary" tab of the workflow run.
-- **Block on fixable-only vulnerabilities** — `pip_audit_block_on: fixable` (the default) fails CI only when a patched version exists, so you can act on it immediately; unfixable CVEs are reported but don't block.
-- **Automatic requirements export** — pass `package_manager: uv|poetry|pipenv` and the action runs the appropriate export command before invoking pip-audit, saving you an extra workflow step.
+- **Block on fixable-only vulnerabilities** — `pip_audit_block_on: fixable` (the default) fails CI only when a patched version exists, so you can act on it immediately; unfixable CVEs are reported but don't block. The official pip-audit action does not have this mode.
+- **Automatic requirements export** — pass `package_manager: uv|poetry|pipenv` and the action runs the appropriate export command before invoking pip-audit. With the official pip-audit action, you must add a separate step to export first.
+
+### Comparison with running the tools separately
+
+**Using the two official actions (uv project, bandit + pip-audit):**
+
+```yaml
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Static analysis
+      - uses: PyCQA/bandit-action@v1
+        with:
+          targets: src/
+
+      # Export dependencies before pip-audit (required for uv projects)
+      - name: Export requirements
+        run: uv export --no-dev --format requirements-txt > requirements.txt
+
+      # Dependency audit
+      - uses: pypa/gh-action-pip-audit@v1
+        with:
+          inputs: requirements.txt
+          # Note: no built-in "fixable-only" blocking mode
+          # Note: findings appear only in the Actions log — no PR comment
+```
+
+**Using this action (equivalent result, one step):**
+
+```yaml
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # for the unified PR comment
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lhoupert/action-python-security-auditing@12efad3bddc3efd3668cf6ac6799f94837f4fb3d # v0.5.0
+        with:
+          package_manager: uv        # export handled automatically
+          bandit_scan_dirs: 'src/'
+          pip_audit_block_on: fixable  # only block when a fix exists
+          # Posts a unified PR comment and step summary automatically
+```
 
 ## What the PR comment looks like
 
