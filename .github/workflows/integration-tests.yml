@@ -230,9 +230,11 @@ jobs:
 
       - name: Record step outcome
         if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
         run: |
           mkdir -p outcome
-          echo "${{ steps.audit.outcome }}" > outcome/outcome.txt
+          echo "$AUDIT_OUTCOME" > outcome/outcome.txt
 
       - name: Upload outcome
         if: always()
@@ -248,7 +250,7 @@ jobs:
     needs: [integration-test]
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write # Post or update the integration-test validation report on PRs
 
     steps:
       - name: Checkout action repo
@@ -298,6 +300,8 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           if [ ! -f validation-report.md ]; then
             echo "No report generated" >&2
@@ -305,12 +309,11 @@ jobs:
           fi
 
           MARKER="<!-- integration-test-validation-report -->"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
 
           # Find existing comment with our marker
           COMMENT_ID=$(
             gh api \
-              "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
               --paginate -q \
               ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
             | head -n 1
@@ -318,7 +321,7 @@ jobs:
 
           if [ -n "$COMMENT_ID" ]; then
             gh api \
-              "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" \
               --method PATCH \
               -F "body=@validation-report.md"
             echo "Updated existing comment ${COMMENT_ID}"

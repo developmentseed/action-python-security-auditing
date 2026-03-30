@@ -7,17 +7,21 @@ on:
     # Weekly on Saturdays.
     - cron: "30 1 * * 6"
 
-permissions: read-all
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read # Required by Scorecard to evaluate workflow security posture
 
 jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
     permissions:
-      # Needed for Code scanning upload
-      security-events: write
-      # Needed for GitHub OIDC token if publish_results is true
-      id-token: write
+      security-events: write # Upload Scorecard SARIF to the code scanning API
+      id-token: write # GitHub OIDC token when publish_results is true
 
     steps:
       - name: "Checkout code"
