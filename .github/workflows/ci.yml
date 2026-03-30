@@ -58,4 +58,4 @@ jobs:
         with:
           bandit_scan_dirs: src
           package_manager: uv
-          comment_on: ${{ github.event_name == 'pull_request' && 'always' || 'never' }}
+          comment_on: never #${{ github.event_name == 'pull_request' && 'always' || 'never' }}
