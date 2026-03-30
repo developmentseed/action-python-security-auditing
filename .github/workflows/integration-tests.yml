@@ -223,7 +223,7 @@ jobs:
           bandit_scan_dirs: ${{ matrix.bandit_scan_dirs }}
           bandit_severity_threshold: ${{ matrix.bandit_severity_threshold }}
           pip_audit_block_on: ${{ matrix.pip_audit_block_on }}
-          post_pr_comment: 'false'
+          comment_on: never
           artifact_name: security-audit-${{ matrix.id }}
 
       # --- Record outcome so the validate job can reconstruct NEEDS_JSON ---
