@@ -1,0 +1,328 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Run each test scenario against the local composite action ──
+  integration-test:
+    name: "Test ${{ matrix.id }}"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: "01"
+            working_directory: integration-tests/cases/01-requirements-flat
+            package_manager: requirements
+            requirements_file: requirements.txt
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: ""
+
+          - id: "02"
+            working_directory: integration-tests/cases/02-requirements-src-bandit
+            package_manager: requirements
+            requirements_file: requirements.txt
+            bandit_scan_dirs: src/
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: ""
+
+          - id: "03"
+            working_directory: integration-tests/cases/03-requirements-multi-both
+            package_manager: requirements
+            requirements_file: requirements.txt
+            bandit_scan_dirs: "src/,scripts/"
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: ""
+
+          - id: "04"
+            working_directory: integration-tests/cases/04-uv-flat
+            package_manager: uv
+            requirements_file: ""
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: uv
+
+          - id: "05"
+            working_directory: integration-tests/cases/05-uv-src-vuln
+            package_manager: uv
+            requirements_file: ""
+            bandit_scan_dirs: src/
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: uv
+
+          - id: "06"
+            working_directory: integration-tests/cases/06-uv-multi-bandit
+            package_manager: uv
+            requirements_file: ""
+            bandit_scan_dirs: "src/,scripts/"
+            bandit_severity_threshold: medium
+            pip_audit_block_on: none
+            tools: "bandit,pip-audit"
+            setup: uv
+
+          - id: "07"
+            working_directory: integration-tests/cases/07-poetry-flat
+            package_manager: poetry
+            requirements_file: ""
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: poetry
+
+          - id: "08"
+            working_directory: integration-tests/cases/08-poetry-src-both
+            package_manager: poetry
+            requirements_file: ""
+            bandit_scan_dirs: src/
+            bandit_severity_threshold: medium
+            pip_audit_block_on: all
+            tools: "bandit,pip-audit"
+            setup: poetry
+
+          - id: "09"
+            working_directory: integration-tests/cases/09-pipenv-flat
+            package_manager: pipenv
+            requirements_file: ""
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: pipenv
+
+          - id: "10"
+            working_directory: integration-tests/cases/10-pipenv-multi-bandit
+            package_manager: pipenv
+            requirements_file: ""
+            bandit_scan_dirs: "src/,scripts/"
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: pipenv
+
+          # Test 11: working_directory is repo root; paths are prefixed with integration-tests/cases/
+          - id: "11"
+            working_directory: "."
+            package_manager: requirements
+            requirements_file: integration-tests/cases/11-requirements-root/requirements.txt
+            bandit_scan_dirs: integration-tests/cases/11-requirements-root
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: ""
+
+          # Tests 12 & 14: bandit-only — no lockfile setup needed
+          - id: "12"
+            working_directory: integration-tests/cases/12-uv-flat-bandit-only
+            package_manager: uv
+            requirements_file: ""
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: bandit
+            setup: ""
+
+          - id: "13"
+            working_directory: integration-tests/cases/13-requirements-unfixable
+            package_manager: requirements
+            requirements_file: requirements.txt
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: high
+            pip_audit_block_on: fixable
+            tools: "bandit,pip-audit"
+            setup: ""
+
+          - id: "14"
+            working_directory: integration-tests/cases/14-uv-low-threshold
+            package_manager: uv
+            requirements_file: ""
+            bandit_scan_dirs: "."
+            bandit_severity_threshold: low
+            pip_audit_block_on: fixable
+            tools: bandit
+            setup: ""
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout action repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # --- Package-manager-specific lockfile setup ---
+
+      - name: Set up uv
+        if: matrix.setup == 'uv'
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.3.1
+
+      - name: Generate uv.lock
+        if: matrix.setup == 'uv'
+        working-directory: ${{ matrix.working_directory }}
+        run: uv lock
+
+      - name: Set up Poetry
+        if: matrix.setup == 'poetry'
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+
+      - name: Generate poetry.lock
+        if: matrix.setup == 'poetry'
+        working-directory: ${{ matrix.working_directory }}
+        run: poetry lock
+
+      - name: Set up Python (for pipenv)
+        if: matrix.setup == 'pipenv'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pipenv
+        if: matrix.setup == 'pipenv'
+        run: pip install pipenv
+
+      - name: Generate Pipfile.lock
+        if: matrix.setup == 'pipenv'
+        working-directory: ${{ matrix.working_directory }}
+        run: pipenv install
+
+      # --- Run the composite action at the current commit ---
+
+      - name: Run security audit
+        id: audit
+        uses: ./
+        continue-on-error: true
+        with:
+          working_directory: ${{ matrix.working_directory }}
+          package_manager: ${{ matrix.package_manager }}
+          tools: ${{ matrix.tools }}
+          requirements_file: ${{ matrix.requirements_file }}
+          bandit_scan_dirs: ${{ matrix.bandit_scan_dirs }}
+          bandit_severity_threshold: ${{ matrix.bandit_severity_threshold }}
+          pip_audit_block_on: ${{ matrix.pip_audit_block_on }}
+          post_pr_comment: 'false'
+          artifact_name: security-audit-${{ matrix.id }}
+
+      # --- Record outcome so the validate job can reconstruct NEEDS_JSON ---
+
+      - name: Record step outcome
+        if: always()
+        run: |
+          mkdir -p outcome
+          echo "${{ steps.audit.outcome }}" > outcome/outcome.txt
+
+      - name: Upload outcome
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        with:
+          name: test-outcome-${{ matrix.id }}
+          path: outcome/outcome.txt
+
+  # ── Validate all results against expected_results.yml ──────────
+  validate:
+    name: Validate results
+    if: always()
+    needs: [integration-test]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout action repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download security-audit artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: security-audit-*
+          path: artifacts
+
+      - name: Download outcome artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: test-outcome-*
+          path: artifacts
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      # Build NEEDS_JSON from outcome files — validate_results.py expects
+      # {"test-01": {"result": "success"}, ...} (same shape as toJSON(needs))
+      - name: Build NEEDS_JSON from outcome artifacts
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+          needs = {}
+          for f in sorted(Path("artifacts").glob("test-outcome-*/outcome.txt")):
+              num = f.parent.name.replace("test-outcome-", "")
+              needs["test-" + num] = {"result": f.read_text().strip()}
+          print("NEEDS_JSON=" + json.dumps(needs))
+          EOF
+
+      - name: Validate test outcomes
+        env:
+          NEEDS_JSON: ${{ env.NEEDS_JSON }}
+        run: python integration-tests/validate_results.py
+
+      - name: Post or update PR comment
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f validation-report.md ]; then
+            echo "No report generated" >&2
+            exit 0
+          fi
+
+          MARKER="<!-- integration-test-validation-report -->"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          # Find existing comment with our marker
+          COMMENT_ID=$(
+            gh api \
+              "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              --paginate -q \
+              ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+            | head -n 1
+          )
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api \
+              "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              --method PATCH \
+              -F "body=@validation-report.md"
+            echo "Updated existing comment ${COMMENT_ID}"
+          else
+            gh pr comment "${PR_NUMBER}" --body-file validation-report.md
+            echo "Created new comment"
+          fi

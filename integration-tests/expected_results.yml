@@ -1,0 +1,135 @@
+# Expected outcomes for each test workflow.
+# Used by .github/scripts/validate_results.py to verify that
+# the security-auditing action behaves as documented.
+#
+# When adding a new test case, add an entry here and update
+# EXPECTED_COUNT in validate_results.py.
+
+tests:
+  "01":
+    name: "requirements · flat · clean"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings: []
+
+  "02":
+    name: "requirements · src/ · bandit HIGH"
+    expected_conclusion: failure
+    bandit_findings:
+      - rule_id: B602
+        level: error
+      - rule_id: B105
+        level: warning
+      - rule_id: B404
+        level: note
+    pip_audit_findings: []
+
+  "03":
+    name: "requirements · src/+scripts/ · bandit HIGH + pip-audit"
+    expected_conclusion: failure
+    bandit_findings:
+      - rule_id: B602
+        level: error
+      - rule_id: B105
+        level: warning
+      - rule_id: B404
+        level: note
+    pip_audit_findings:
+      - package: requests
+        has_fix: true
+      - package: cryptography
+        has_fix: true
+
+  "04":
+    name: "uv · flat · clean"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings: []
+
+  "05":
+    name: "uv · src/ · pip-audit vuln"
+    expected_conclusion: failure
+    bandit_findings: []
+    pip_audit_findings:
+      - package: requests
+        has_fix: true
+
+  "06":
+    name: "uv · src/+scripts/ · bandit MEDIUM"
+    expected_conclusion: failure
+    bandit_findings:
+      - rule_id: B506
+        level: warning
+      - rule_id: B324
+        level: warning
+    pip_audit_findings: []
+
+  "07":
+    name: "poetry · flat · clean"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings: []
+
+  "08":
+    name: "poetry · src/ · bandit MEDIUM + pip-audit"
+    expected_conclusion: failure
+    bandit_findings:
+      - rule_id: B324
+        level: warning
+      - rule_id: B105
+        level: warning
+    pip_audit_findings:
+      - package: cryptography
+        has_fix: true
+      - package: requests
+        has_fix: true
+
+  "09":
+    name: "pipenv · flat · clean"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings: []
+
+  "10":
+    name: "pipenv · src/+scripts/ · bandit HIGH"
+    expected_conclusion: failure
+    bandit_findings:
+      - rule_id: B602
+        level: error
+      - rule_id: B404
+        level: note
+    pip_audit_findings: []
+
+  "11":
+    name: "requirements · flat · clean (root working dir)"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings: []
+
+  "12":
+    name: "uv · flat · bandit-only (no pip-audit)"
+    expected_conclusion: failure
+    pip_audit_disabled: true
+    bandit_findings:
+      - rule_id: B602
+        level: error
+      - rule_id: B404
+        level: note
+    pip_audit_findings: []
+
+  "13":
+    name: "requirements · flat · unfixable vulns (should pass)"
+    expected_conclusion: success
+    bandit_findings: []
+    pip_audit_findings:
+      - package: pygments
+        has_fix: false
+
+  "14":
+    name: "uv · flat · low threshold (B101 assert)"
+    expected_conclusion: failure
+    pip_audit_disabled: true
+    bandit_findings:
+      - rule_id: B101
+        level: note
+    pip_audit_findings: []

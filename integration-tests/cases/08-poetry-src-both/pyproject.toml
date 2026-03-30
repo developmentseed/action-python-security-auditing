@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "poetry-src-both"
+version = "0.1.0"
+description = "Poetry project with bandit issues and vulnerable deps"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.11"
+cryptography = "38.0.0"
+requests = "2.25.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

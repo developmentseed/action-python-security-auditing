@@ -1,0 +1,5 @@
+[project]
+name = "test-14-low-threshold"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = ["click>=8.1.7"]

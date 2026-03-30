@@ -10,10 +10,12 @@ repos:
     rev: v1.10.0
     hooks:
       - id: mypy
+        exclude: ^integration-tests/cases/
         additional_dependencies:
           - pydantic-settings>=2.0
           - bandit>=1.8
           - pytest>=8.0
+          - types-PyYAML>=6.0
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.23.1

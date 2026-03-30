@@ -20,6 +20,8 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.5",
     "types-requests",
+    "types-PyYAML",
+    "pyyaml>=6.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -27,6 +29,7 @@ packages = ["src/python_security_auditing"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["integration-tests/cases"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
@@ -34,6 +37,8 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
+exclude = ["integration-tests/cases"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "integration-tests/tests"]
+pythonpath = ["integration-tests"]
