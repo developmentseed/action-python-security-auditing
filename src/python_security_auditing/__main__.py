@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .annotations import emit_annotations
 from .pr_comment import upsert_pr_comment
 from .report import build_markdown, check_thresholds, write_step_summary
 from .runners import generate_requirements, read_bandit_sarif, run_pip_audit
@@ -47,11 +48,15 @@ def main() -> None:
 
     markdown = build_markdown(bandit_report, pip_audit_report, settings)
     write_step_summary(markdown, settings)
+    emit_annotations(bandit_report, pip_audit_report, settings)
 
-    if settings.post_pr_comment and settings.github_token:
-        upsert_pr_comment(markdown, settings)
+    has_blocking = check_thresholds(bandit_report, pip_audit_report, settings)
 
-    if check_thresholds(bandit_report, pip_audit_report, settings):
+    if settings.github_token and settings.comment_on != "never":
+        if settings.comment_on == "always" or has_blocking:
+            upsert_pr_comment(markdown, settings)
+
+    if has_blocking:
         sys.exit(1)
 
 
