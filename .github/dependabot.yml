@@ -11,6 +11,8 @@ updates:
 
   - package-ecosystem: pip
     directory: /
+    exclude-paths:
+      - "integration-tests/**"
     schedule:
       interval: weekly
     commit-message:
