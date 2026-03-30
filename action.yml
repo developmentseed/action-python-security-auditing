@@ -89,7 +89,7 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         INPUT_DEBUG: ${{ inputs.debug }}
         RUNNER_DEBUG: ${{ runner.debug }}
-      run: uv run --no-project --with "${{ github.action_path }}" python -m python_security_auditing
+      run: uv run --no-project --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
 
     - name: Upload ${{ inputs.artifact_name }}
       if: always()

@@ -4,15 +4,20 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
   release-please:
+    name: Release Please
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # Create releases, tags, and release branches
+      pull-requests: write # Open and update pin README pull requests
     steps:
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         id: release
@@ -28,31 +33,36 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_MAJOR: ${{ steps.release.outputs.major }}
+          RELEASE_TAG_NAME: ${{ steps.release.outputs.tag_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git tag -fa "v${{ steps.release.outputs.major }}" \
-            -m "Release v${{ steps.release.outputs.tag_name }}"
-          git push origin "v${{ steps.release.outputs.major }}" --force
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git tag -fa "v${RELEASE_MAJOR}" \
+            -m "Release v${RELEASE_TAG_NAME}"
+          git push origin "v${RELEASE_MAJOR}" --force
 
       - name: Pin README to release SHA
         if: ${{ steps.release.outputs.release_created }}
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_TAG_NAME: ${{ steps.release.outputs.tag_name }}
         run: |
           sed -i -E \
-            's|lhoupert/action-python-security-auditing@[^ ]+( # v[0-9][^ ]*)?|lhoupert/action-python-security-auditing@${{ steps.release.outputs.sha }} # ${{ steps.release.outputs.tag_name }}|g' \
+            "s|developmentseed/action-python-security-auditing@[^ ]+( # v[0-9][^ ]*)?|developmentseed/action-python-security-auditing@${RELEASE_SHA} # ${RELEASE_TAG_NAME}|g" \
             README.md
           git add README.md
           git diff --cached --quiet && echo "README unchanged, skipping commit" && exit 0
-          BRANCH="chore/pin-readme-${{ steps.release.outputs.tag_name }}"
+          BRANCH="chore/pin-readme-${RELEASE_TAG_NAME}"
           git checkout -b "$BRANCH"
-          git commit -m "chore: pin README to ${{ steps.release.outputs.tag_name }}"
+          git commit -m "chore: pin README to ${RELEASE_TAG_NAME}"
           git push origin "$BRANCH"
           gh pr create \
-            --title "chore: pin README to ${{ steps.release.outputs.tag_name }}" \
-            --body "Automated: pin README SHA references to release ${{ steps.release.outputs.tag_name }}." \
+            --title "chore: pin README to ${RELEASE_TAG_NAME}" \
+            --body "Automated: pin README SHA references to release ${RELEASE_TAG_NAME}." \
             --base main \
             --head "$BRANCH"
 
@@ -60,9 +70,11 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         env:
           GH_TOKEN: ${{ secrets.TESTS_REPO_DISPATCH_TOKEN }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_TAG_NAME: ${{ steps.release.outputs.tag_name }}
         run: |
           gh api repos/lhoupert/action-python-security-auditing-tests/dispatches \
             --method POST \
             -f event_type=action-release \
-            -F client_payload[sha]='${{ steps.release.outputs.sha }}' \
-            -F client_payload[tag]='${{ steps.release.outputs.tag_name }}'
+            -F "client_payload[sha]=${RELEASE_SHA}" \
+            -F "client_payload[tag]=${RELEASE_TAG_NAME}"
