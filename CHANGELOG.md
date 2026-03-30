@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/lhoupert/action-python-security-auditing/compare/v0.4.3...v0.5.0) (2026-03-30)
+
+
+### Features
+
+* add integration tests ([#42](https://github.com/lhoupert/action-python-security-auditing/issues/42)) ([437ac46](https://github.com/lhoupert/action-python-security-auditing/commit/437ac46491009a5784e6defab2a933901fe2dfe0))
+
 ## [0.4.3](https://github.com/lhoupert/action-python-security-auditing/compare/v0.4.2...v0.4.3) (2026-03-28)
 
 
