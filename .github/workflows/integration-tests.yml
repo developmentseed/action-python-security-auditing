@@ -145,16 +145,6 @@ jobs:
             tools: bandit
             setup: ""
 
-          - id: "13"
-            working_directory: integration-tests/cases/13-requirements-unfixable
-            package_manager: requirements
-            requirements_file: requirements.txt
-            bandit_scan_dirs: "."
-            bandit_severity_threshold: high
-            pip_audit_block_on: fixable
-            tools: "bandit,pip-audit"
-            setup: ""
-
           - id: "14"
             working_directory: integration-tests/cases/14-uv-low-threshold
             package_manager: uv

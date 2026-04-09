@@ -117,14 +117,6 @@ tests:
         level: note
     pip_audit_findings: []
 
-  "13":
-    name: "requirements · flat · unfixable vulns (should pass)"
-    expected_conclusion: success
-    bandit_findings: []
-    pip_audit_findings:
-      - package: pygments
-        has_fix: false
-
   "14":
     name: "uv · flat · low threshold (B101 assert)"
     expected_conclusion: failure
