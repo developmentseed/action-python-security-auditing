@@ -9,7 +9,7 @@ from typing import Any
 from .annotations import emit_annotations
 from .pr_comment import upsert_pr_comment
 from .report import build_markdown, check_thresholds, write_step_summary
-from .runners import generate_requirements, read_bandit_sarif, run_pip_audit
+from .runners import AuditError, generate_requirements, read_bandit_sarif, run_pip_audit
 from .settings import Settings
 
 
@@ -39,10 +39,15 @@ def main() -> None:
                 f"[debug] generating requirements for package_manager={settings.package_manager}",
                 file=sys.stderr,
             )
-        requirements_path = generate_requirements(settings)
-        if settings.debug:
-            print(f"[debug] running pip-audit on {requirements_path}", file=sys.stderr)
-        pip_audit_report = run_pip_audit(requirements_path, settings)
+        try:
+            requirements_path = generate_requirements(settings)
+            if settings.debug:
+                print(f"[debug] running pip-audit on {requirements_path}", file=sys.stderr)
+            pip_audit_report = run_pip_audit(requirements_path, settings)
+        except (AuditError, FileNotFoundError) as exc:
+            headline = "pip-audit did NOT run, so dependencies were NOT audited."
+            write_step_summary(f"## ❌ {headline}\n\n```\n{exc}\n```\n", settings)
+            sys.exit(f"{headline}\n{exc}")
         if settings.debug:
             print(f"[debug] pip-audit findings: {len(pip_audit_report)}", file=sys.stderr)
 

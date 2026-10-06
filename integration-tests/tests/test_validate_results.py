@@ -4,6 +4,7 @@ Tests are organised by function:
   - TestParseSarif
   - TestParsePipAudit
   - TestValidateTest   (pure logic, no I/O)
+  - TestCheckAudited
   - TestGenerateReport
   - TestMain           (integration, uses tmp_path + monkeypatch)
 """
@@ -249,6 +250,46 @@ class TestValidateTest:
 
 
 # ---------------------------------------------------------------------------
+# check_audited
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAudited:
+    """A pip-audit case without a report, or with nothing audited, must not pass as clean."""
+
+    def _write(self, tmp_path: Path, deps: list[dict[str, Any]]) -> Path:
+        path = tmp_path / "pip-audit-report.json"
+        path.write_text(json.dumps({"dependencies": deps, "fixes": []}))
+        return path
+
+    def test_missing_report_returns_error(self) -> None:
+        errors = vr.check_audited({"expected_conclusion": "success"}, None)
+
+        assert any("did not run" in e for e in errors)
+
+    @pytest.mark.parametrize(
+        "deps",
+        [[], [{"name": "my-app", "skip_reason": "Dependency not found on PyPI"}]],
+    )
+    def test_zero_audited_dependencies_returns_error(
+        self, tmp_path: Path, deps: list[dict[str, Any]]
+    ) -> None:
+        errors = vr.check_audited({"expected_conclusion": "success"}, self._write(tmp_path, deps))
+
+        assert any("did not run" in e for e in errors)
+
+    def test_audited_dependency_returns_no_error(self, tmp_path: Path) -> None:
+        path = self._write(tmp_path, [{"name": "requests", "version": "2.32.0", "vulns": []}])
+
+        assert vr.check_audited({"expected_conclusion": "success"}, path) == []
+
+    def test_pip_audit_disabled_needs_no_report(self) -> None:
+        expected = {"expected_conclusion": "failure", "pip_audit_disabled": True}
+
+        assert vr.check_audited(expected, None) == []
+
+
+# ---------------------------------------------------------------------------
 # generate_report
 # ---------------------------------------------------------------------------
 
@@ -314,16 +355,20 @@ class TestMain:
         }
         self._write_expected_yml(tmp_path, tests)
 
-        # Test 01: clean SARIF, no pip-audit artifact
+        clean_audit = {"dependencies": [{"name": "requests", "version": "2.32.0", "vulns": []}]}
+
+        # Test 01: clean SARIF, clean pip-audit report
         art01 = tmp_path / "artifacts" / "security-audit-01"
         art01.mkdir(parents=True)
         (art01 / "results.sarif").write_text(json.dumps({"runs": [{"results": []}]}))
+        (art01 / "pip-audit-report.json").write_text(json.dumps(clean_audit))
 
-        # Test 02: B602 finding in SARIF
+        # Test 02: B602 finding in SARIF; pip-audit report nested, as artifact upload does
         art02 = tmp_path / "artifacts" / "security-audit-02"
-        art02.mkdir(parents=True)
+        (art02 / "02-case").mkdir(parents=True)
         sarif02 = {"runs": [{"results": [{"ruleId": "B602", "level": "error"}]}]}
         (art02 / "results.sarif").write_text(json.dumps(sarif02))
+        (art02 / "02-case" / "pip-audit-report.json").write_text(json.dumps(clean_audit))
 
         needs = {"test-01": {"result": "success"}, "test-02": {"result": "failure"}}
         monkeypatch.setenv("NEEDS_JSON", json.dumps(needs))
@@ -334,6 +379,32 @@ class TestMain:
         monkeypatch.chdir(tmp_path)
 
         assert vr.main() == 0
+
+    def test_missing_pip_audit_report_returns_one(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        tests = {
+            "01": {
+                "name": "clean",
+                "expected_conclusion": "success",
+                "bandit_findings": [],
+                "pip_audit_findings": [],
+            },
+        }
+        self._write_expected_yml(tmp_path, tests)
+        art01 = tmp_path / "artifacts" / "security-audit-01"
+        art01.mkdir(parents=True)
+        (art01 / "results.sarif").write_text(json.dumps({"runs": [{"results": []}]}))
+
+        monkeypatch.setenv("NEEDS_JSON", json.dumps({"test-01": {"result": "success"}}))
+        monkeypatch.setattr(vr, "EXPECTED_COUNT", 1)
+        monkeypatch.setattr(vr, "ARTIFACTS_DIR", tmp_path / "artifacts")
+        monkeypatch.setattr(vr, "EXPECTED_RESULTS_PATH", tmp_path / "expected_results.yml")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.chdir(tmp_path)
+
+        assert vr.main() == 1
+        assert "did not run" in (tmp_path / "validation-report.md").read_text()
 
     def test_conclusion_mismatch_returns_one(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -16,7 +16,7 @@ inputs:
     description: When to block on pip-audit findings — fixable, all, or none
     default: fixable
   package_manager:
-    description: How to resolve dependencies for pip-audit (uv, pip, poetry, pipenv, requirements)
+    description: How to resolve dependencies for pip-audit (uv, poetry, pipenv, requirements)
     default: requirements
   requirements_file:
     description: Path to requirements file when package_manager=requirements

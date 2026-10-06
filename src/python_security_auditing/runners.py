@@ -13,6 +13,10 @@ from typing import Any
 from .settings import Settings
 
 
+class AuditError(Exception):
+    """The dependency list or the pip-audit report could not be produced."""
+
+
 def _resolve_exe(name: str) -> str:
     """Resolve an executable name to its full path via PATH, raising if not found."""
     resolved = shutil.which(name)
@@ -24,14 +28,24 @@ def _resolve_exe(name: str) -> str:
 def generate_requirements(settings: Settings) -> Path:
     """Return a requirements.txt Path suitable for pip-audit.
 
-    For package managers that don't produce a file directly (pip, pipenv),
+    For package managers that don't produce a file directly (pipenv),
     captures stdout into a temp file. For 'requirements', returns the
-    configured path unchanged.
+    configured path unchanged. Raises AuditError when no list can be produced.
     """
     pm = settings.package_manager
 
+    if pm == "pip":
+        # `pip freeze` here would list this action's own environment, not the caller's.
+        raise AuditError(
+            "package_manager 'pip' is not supported: run `pip freeze > requirements.txt` "
+            "in your job and use `package_manager: requirements`."
+        )
+
     if pm == "requirements":
-        return Path(settings.requirements_file)
+        path = Path(settings.requirements_file)
+        if not path.is_file():
+            raise AuditError(f"requirements file not found: {path}")
+        return path
 
     tmp = tempfile.NamedTemporaryFile(suffix="-requirements.txt", delete=False, mode="w")
     tmp.close()
@@ -44,6 +58,7 @@ def generate_requirements(settings: Settings) -> Path:
             "--format",
             "requirements-txt",
             "--no-hashes",
+            "--no-emit-project",
             "-o",
             str(out_path),
         ]
@@ -57,23 +72,12 @@ def generate_requirements(settings: Settings) -> Path:
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
-            print(
-                f"uv export failed (no lockfile?): {exc.stderr.strip()}",
-                file=sys.stderr,
-            )
-            return out_path
+            raise AuditError(f"uv export failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
                 f"[debug] generated requirements ({out_path}):\n{out_path.read_text()}",
                 file=sys.stderr,
             )
-    elif pm == "pip":
-        result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
-            [_resolve_exe("pip"), "freeze"], capture_output=True, text=True, check=True
-        )
-        out_path.write_text(result.stdout)
-        if settings.debug:
-            print(f"[debug] pip freeze output ({out_path}):\n{result.stdout}", file=sys.stderr)
     elif pm == "poetry":
         # poetry-plugin-export is bundled in Poetry 1.8+; ignore failure here
         subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
@@ -98,28 +102,23 @@ def generate_requirements(settings: Settings) -> Path:
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
-            print(
-                f"poetry export failed (no lockfile?): {exc.stderr.strip()}",
-                file=sys.stderr,
-            )
-            return out_path
+            raise AuditError(f"poetry export failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
                 f"[debug] poetry export output ({out_path}):\n{out_path.read_text()}",
                 file=sys.stderr,
             )
     elif pm == "pipenv":
+        # Without a lockfile, `pipenv requirements` exits 0 and prints no packages.
+        if not Path("Pipfile.lock").is_file():
+            raise AuditError("Pipfile.lock not found: commit it or run `pipenv lock` first.")
         try:
             result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
                 [_resolve_exe("pipenv"), "requirements"], capture_output=True, text=True, check=True
             )
             out_path.write_text(result.stdout)
         except subprocess.CalledProcessError as exc:
-            print(
-                f"pipenv requirements failed (no lockfile?): {exc.stderr.strip()}",
-                file=sys.stderr,
-            )
-            return out_path
+            raise AuditError(f"pipenv requirements failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
                 f"[debug] pipenv requirements output ({out_path}):\n{result.stdout}",
@@ -174,20 +173,21 @@ def read_bandit_sarif(sarif_path: Path) -> dict[str, Any]:
 def run_pip_audit(
     requirements_path: Path, settings: Settings | None = None
 ) -> list[dict[str, Any]]:
-    """Run pip-audit, write pip-audit-report.json, return parsed report."""
+    """Run pip-audit, write pip-audit-report.json, return parsed report.
+
+    Raises AuditError when pip-audit does not produce a JSON report.
+    """
     output_file = Path("pip-audit-report.json")
     cmd = [_resolve_exe("pip-audit"), "-r", str(requirements_path), "--no-deps", "-f", "json"]
+    if settings and settings.package_manager != "requirements":
+        # Exports are fully pinned: audit them as written. Without --disable-pip,
+        # pip-audit resolves them with pip (building the project) and ignores --no-deps.
+        cmd.append("--disable-pip")
 
     if settings and settings.debug:
         print(f"[debug] pip-audit command: {cmd}", file=sys.stderr)
 
     result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603,B605 -- list args, full path via _resolve_exe()
-    # pip-audit exits 1 when vulnerabilities are found — that is expected
-    if result.returncode not in (0, 1):
-        print(
-            f"pip-audit exited with unexpected code {result.returncode}:\n{result.stderr}",
-            file=sys.stderr,
-        )
 
     if settings and settings.debug:
         print(
@@ -196,12 +196,13 @@ def run_pip_audit(
             file=sys.stderr,
         )
 
-    raw = result.stdout.strip()
-    if raw:
-        parsed: Any = json.loads(raw)
-        output_file.write_text(raw)
-        # pip-audit 2.7+ wraps output in {"dependencies": [...], "fixes": [...]}
-        if isinstance(parsed, dict):
-            return list(parsed.get("dependencies", []))
-        return list(parsed)
-    return []
+    # pip-audit exits 1 both when it finds vulnerabilities and when it fails,
+    # so only a JSON report proves that the audit ran.
+    try:
+        dependencies = list(json.loads(result.stdout)["dependencies"])
+    except (ValueError, KeyError, TypeError) as exc:
+        raise AuditError(
+            f"pip-audit failed (exit {result.returncode}):\n{result.stderr.strip()}"
+        ) from exc
+    output_file.write_text(result.stdout)
+    return dependencies

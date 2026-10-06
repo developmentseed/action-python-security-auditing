@@ -139,6 +139,20 @@ def validate_test(
     return errors
 
 
+def check_audited(expected: dict[str, Any], pip_audit_path: Path | None) -> list[str]:
+    """Error when a pip-audit case has no report or audited zero dependencies.
+
+    The action used to report a crashed or empty audit as clean, so a case
+    without a report would otherwise pass as "no vulns".
+    """
+    if expected.get("pip_audit_disabled", False):
+        return []
+    deps = json.loads(pip_audit_path.read_bytes())["dependencies"] if pip_audit_path else []
+    if not any("skip_reason" not in dep for dep in deps):
+        return ["pip-audit: no report or zero dependencies audited (the audit did not run)"]
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
@@ -251,21 +265,18 @@ def main() -> int:
         if sarif_path.exists():
             bandit_findings = parse_sarif(sarif_path)
 
-        pip_audit_path = artifact_dir / "pip-audit-report.json"
-        if pip_audit_path.exists():
+        # Artifact upload uses least common ancestor, so the file may be nested
+        # e.g. artifacts/security-audit-08/08-poetry-src-both/pip-audit-report.json
+        pip_audit_path = next(artifact_dir.rglob("pip-audit-report.json"), None)
+        if pip_audit_path:
             pip_audit_findings = parse_pip_audit(pip_audit_path)
-        else:
-            # Artifact upload uses least common ancestor, so the file may be nested
-            # e.g. artifacts/security-audit-08/08-poetry-src-both/pip-audit-report.json
-            nested = next(artifact_dir.rglob("pip-audit-report.json"), None)
-            if nested:
-                pip_audit_findings = parse_pip_audit(nested)
 
         all_bandit[num] = bandit_findings
         all_pip_audit[num] = pip_audit_findings
 
         conclusion = conclusions.get(num, "missing")
         errors = validate_test(num, exp, conclusion, bandit_findings, pip_audit_findings)
+        errors += check_audited(exp, pip_audit_path)
         all_errors[num] = errors
 
         status = "✅" if not errors else "❌"
