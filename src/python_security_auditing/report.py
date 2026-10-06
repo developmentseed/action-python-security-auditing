@@ -13,6 +13,7 @@ def build_markdown(
     bandit_report: dict[str, Any],
     pip_audit_report: list[dict[str, Any]],
     settings: Settings,
+    pip_audit_error: str = "",
 ) -> str:
     """Build a full markdown security report."""
     sections: list[str] = ["# Security Audit Report\n"]
@@ -29,9 +30,9 @@ def build_markdown(
         sections.append(_bandit_section(bandit_report, settings))
 
     if "pip-audit" in settings.enabled_tools:
-        sections.append(_pip_audit_section(pip_audit_report, settings))
+        sections.append(_pip_audit_section(pip_audit_report, settings, pip_audit_error))
 
-    blocking = check_thresholds(bandit_report, pip_audit_report, settings)
+    blocking = check_thresholds(bandit_report, pip_audit_report, settings) or bool(pip_audit_error)
     sections.append("---\n")
     if blocking:
         sections.append("**Result: ❌ Blocking issues found — see details above.**\n")
@@ -103,7 +104,7 @@ def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
     return "\n".join(lines)
 
 
-def _pip_audit_section(report: list[dict[str, Any]], settings: Settings) -> str:
+def _pip_audit_section(report: list[dict[str, Any]], settings: Settings, error: str) -> str:
     vulnerable = [pkg for pkg in report if pkg.get("vulns")]
     security_url = (
         f"https://github.com/{settings.github_repository}/security/dependabot"
@@ -116,6 +117,18 @@ def _pip_audit_section(report: list[dict[str, Any]], settings: Settings) -> str:
         else "## pip-audit — Dependency Vulnerabilities\n"
     )
     lines = [heading]
+
+    if error:
+        lines.append(
+            f"❌ pip-audit did NOT run, so dependencies were NOT audited.\n\n```\n{error}\n```\n"
+        )
+        return "\n".join(lines)
+
+    audited = sum("skip_reason" not in pkg for pkg in report)
+    lines.append(f"_Dependencies audited: {audited}, skipped: {len(report) - audited}._\n")
+    if not audited:
+        lines.append("⚠️ No dependencies were audited.\n")
+        return "\n".join(lines)
 
     if not vulnerable:
         lines.append("✅ No vulnerabilities found.\n")

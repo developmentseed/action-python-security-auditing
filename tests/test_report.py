@@ -189,6 +189,36 @@ def test_markdown_pip_table(bandit_clean: dict[str, Any], pip_fixable: list[Any]
     assert "GHSA-j8r2-6x86-q33q" in md
 
 
+def test_markdown_pip_counts_audited_and_skipped(bandit_clean: dict[str, Any]) -> None:
+    report: list[dict[str, Any]] = [
+        {"name": "requests", "version": "2.32.0", "vulns": []},
+        {"name": "my-app", "version": "0.1.0", "skip_reason": "Dependency not found on PyPI"},
+    ]
+    md = build_markdown(bandit_clean, report, Settings())
+    assert "Dependencies audited: 1, skipped: 1" in md
+    assert "No vulnerabilities found" in md
+
+
+@pytest.mark.parametrize(
+    "report",
+    [[], [{"name": "my-app", "version": "0.1.0", "skip_reason": "Dependency not found on PyPI"}]],
+)
+def test_markdown_zero_audited_is_not_reported_clean(
+    bandit_clean: dict[str, Any], report: list[Any]
+) -> None:
+    md = build_markdown(bandit_clean, report, Settings())
+    assert "No vulnerabilities found" not in md
+    assert "No dependencies were audited" in md
+
+
+def test_markdown_pip_audit_error(bandit_issues: dict[str, Any]) -> None:
+    md = build_markdown(bandit_issues, [], Settings(), pip_audit_error="uv export failed: boom")
+    assert "B404" in md  # bandit results are still shown
+    assert "pip-audit did NOT run" in md
+    assert "uv export failed: boom" in md
+    assert "No vulnerabilities found" not in md
+
+
 def test_markdown_run_url(
     bandit_clean: dict[str, Any], pip_clean: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -13,6 +13,8 @@ from typing import Any
 
 from .settings import Settings
 
+PIP_AUDIT_REPORT = Path("pip-audit-report.json")
+
 
 class AuditError(Exception):
     """The dependency list or the pip-audit report could not be produced."""
@@ -187,7 +189,6 @@ def run_pip_audit(
 
     Raises AuditError when pip-audit does not produce a JSON report.
     """
-    output_file = Path("pip-audit-report.json")
     cmd = [_resolve_exe("pip-audit"), "-r", str(requirements_path), "--no-deps", "-f", "json"]
     if settings and settings.package_manager != "requirements":
         # Exports are fully pinned: audit them as written. Without --disable-pip,
@@ -214,5 +215,5 @@ def run_pip_audit(
         raise AuditError(
             f"pip-audit failed (exit {result.returncode}):\n{result.stderr.strip()}"
         ) from exc
-    output_file.write_text(result.stdout)
+    PIP_AUDIT_REPORT.write_text(result.stdout)
     return dependencies

@@ -98,7 +98,7 @@ def test_comment_on_blocking_skips_upsert_when_clean(
 
 
 def test_main_fails_closed_when_uv_export_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A failed export must fail the step and say so, not report 'No vulnerabilities found'."""
     sarif_path = tmp_path / "results.sarif"
@@ -109,12 +109,13 @@ def test_main_fails_closed_when_uv_export_fails(
     monkeypatch.setenv("BANDIT_SARIF_PATH", str(sarif_path))
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
     monkeypatch.chdir(tmp_path)
+    # a report left by an earlier run must not be uploaded as this run's result
+    (tmp_path / "pip-audit-report.json").write_text('{"dependencies": [], "fixes": []}')
 
-    uv_exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
+    uv_exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found\nsecond line")
     with (
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
         patch("python_security_auditing.runners.subprocess.run", side_effect=uv_exc),
-        patch("python_security_auditing.__main__.emit_annotations"),
     ):
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -125,3 +126,40 @@ def test_main_fails_closed_when_uv_export_fails(
     summary = summary_path.read_text()
     assert "pip-audit did NOT run" in summary
     assert "No vulnerabilities found" not in summary
+    out = capsys.readouterr().out
+    assert "::error::pip-audit did NOT run: uv export failed: No uv.lock found%0Asecond line" in out
+    assert not (tmp_path / "pip-audit-report.json").exists()
+
+
+def test_main_reports_bandit_and_comments_when_pip_audit_cannot_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A failed audit must not hide bandit results or leave a stale PR comment."""
+    sarif_path = tmp_path / "results.sarif"
+    sarif_path.write_text((FIXTURES / "bandit_issues.sarif").read_text())
+    summary_path = tmp_path / "summary.md"
+    monkeypatch.setenv("PACKAGE_MANAGER", "uv")
+    monkeypatch.setenv("TOOLS", "bandit,pip-audit")
+    monkeypatch.setenv("BANDIT_SARIF_PATH", str(sarif_path))
+    monkeypatch.setenv("BANDIT_SEVERITY_THRESHOLD", "high")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("COMMENT_ON", "blocking")
+    monkeypatch.chdir(tmp_path)
+
+    uv_exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
+    with (
+        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
+        patch("python_security_auditing.runners.subprocess.run", side_effect=uv_exc),
+        patch("python_security_auditing.__main__.upsert_pr_comment") as mock_comment,
+    ):
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+    assert exc_info.value.code not in (None, 0)
+    summary = summary_path.read_text()
+    assert "B404" in summary  # bandit section still rendered
+    assert "pip-audit did NOT run" in summary
+    assert "::error file=src/app.py,line=2::[B404]" in capsys.readouterr().out
+    mock_comment.assert_called_once()
+    assert "pip-audit did NOT run" in mock_comment.call_args[0][0]

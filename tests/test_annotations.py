@@ -104,6 +104,25 @@ def test_pip_clean_emits_nothing(
     assert capsys.readouterr().out == ""
 
 
+@pytest.mark.parametrize(
+    "report",
+    [[], [{"name": "my-app", "version": "0.1.0", "skip_reason": "Dependency not found on PyPI"}]],
+)
+def test_pip_zero_audited_emits_warning(
+    bandit_clean: dict[str, Any], report: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    emit_annotations(bandit_clean, report, Settings())
+    assert capsys.readouterr().out.startswith("::warning::pip-audit audited 0 dependencies")
+
+
+def test_pip_audit_error_emits_escaped_error(
+    bandit_clean: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    emit_annotations(bandit_clean, [], Settings(), pip_audit_error="uv failed\n100% broken")
+    out = capsys.readouterr().out
+    assert out == "::error::pip-audit did NOT run: uv failed%0A100%25 broken\n"
+
+
 def test_bandit_only_tool_skips_pip(
     bandit_clean: dict[str, Any],
     pip_fixable: list[Any],
