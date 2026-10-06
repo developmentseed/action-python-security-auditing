@@ -161,7 +161,7 @@ permissions:
   security-events: write
 ```
 
-If you don't need Code Scanning integration, `contents: read` alone is sufficient: the SARIF upload then fails without failing the job.
+In a private repository, the Code Scanning upload also needs `actions: read`, because `upload-sarif` reads the workflow run. The upload is best effort: without these permissions it fails without failing the job, and findings still appear in the annotations and the summary. If you don't need Code Scanning integration, `contents: read` alone is sufficient.
 
 ## Usage examples
 
@@ -214,7 +214,14 @@ When your source code spans more than one directory, pass a comma-separated list
 
 ### Configuring bandit
 
-Bandit honours a `.bandit` file (INI, `[bandit]` section, for example `exclude` or `skips`) placed in a scanned directory. `[tool.bandit]` in `pyproject.toml` is not read. Bandit runs on Python 3.13, and a file it cannot parse fails the job, because its findings would otherwise go unreported. To skip such a file on purpose, list it under `exclude`.
+Bandit reads a `.bandit` file (INI, `[bandit]` section, for example `exclude` or `skips`). It does not read `[tool.bandit]` in `pyproject.toml`. Bandit only looks for `.bandit` inside the scanned directories, and it fails if it finds more than one. So keep a single `.bandit`: at the working-directory root when you scan the default `.`, otherwise in one of the `bandit_scan_dirs`.
+
+Bandit runs on Python 3.13. A file it cannot parse fails the job, because its findings would otherwise be missing; the other files' findings are still reported. With the default `bandit_scan_dirs: '.'`, this includes files in a virtual environment or `node_modules` inside the working directory. To skip files on purpose, list them under `exclude`. That list replaces bandit's default excludes, so repeat them. Use `*/name/*` globs for directories: when bandit scans `.`, a plain name such as `.venv` does not match.
+
+```ini
+[bandit]
+exclude = */.git/*,*/__pycache__/*,*/.tox/*,*/.eggs/*,*.egg,*/.venv/*,path/to/file.py
+```
 
 ### Project in a subdirectory (monorepo)
 
