@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/developmentseed/action-python-security-auditing/compare/v0.6.0...v0.6.1) (2026-10-06)
+
+
+### Dependencies
+
+* refresh locks and fixtures, group Dependabot updates, audit runtime deps ([#77](https://github.com/developmentseed/action-python-security-auditing/issues/77)) ([473d58c](https://github.com/developmentseed/action-python-security-auditing/commit/473d58cd7f3941ae3a8c7f54cd7030aeb305e630))
+
 ## [0.6.0](https://github.com/developmentseed/action-python-security-auditing/compare/v0.5.0...v0.6.0) (2026-03-30)
 
 
