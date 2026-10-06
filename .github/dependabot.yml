@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: "ci"
     cooldown:
@@ -11,21 +11,22 @@ updates:
     groups:
       actions:
         patterns: ["*"]
-      actions-security:
-        applies-to: security-updates
-        patterns: ["*"]
+        update-types: [minor, patch] # majors stay separate: they change action.yml for users
 
   # The project is locked with uv (uv.lock), so use the uv ecosystem rather than pip.
+  # Users never install uv.lock (action.yml resolves dependencies at runtime), so these
+  # bumps use `chore`, which release-please does not release.
   - package-ecosystem: uv
     directory: /
-    exclude-paths:
-      - "integration-tests/**"
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
+      include: scope
     cooldown:
       default-days: 7
+    allow:
+      - dependency-type: all # also refresh transitive pins (urllib3, idna, pip, ...)
     groups:
       python:
         patterns: ["*"]
@@ -33,23 +34,35 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  # integration-tests/cases/* are deliberately vulnerable fixtures: never update them.
-  # exclude-paths above only affects version updates; `ignore` also covers security updates.
-  - package-ecosystem: uv
+  # integration-tests/cases/* are deliberately pinned fixtures: never update them.
+  # `ignore` also applies to security updates. Directories are listed explicitly per
+  # ecosystem: a glob would also match cases without a manifest for that ecosystem.
+  - package-ecosystem: pip # requirements.txt, poetry and pipenv cases
     directories:
-      - "/integration-tests/cases/*"
+      - "/integration-tests/cases/01-requirements-flat"
+      - "/integration-tests/cases/02-requirements-src-bandit"
+      - "/integration-tests/cases/03-requirements-multi-both"
+      - "/integration-tests/cases/07-poetry-flat"
+      - "/integration-tests/cases/08-poetry-src-both"
+      - "/integration-tests/cases/09-pipenv-flat"
+      - "/integration-tests/cases/10-pipenv-multi-bandit"
+      - "/integration-tests/cases/11-requirements-root"
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     ignore:
       - dependency-name: "*"
 
-  - package-ecosystem: pip
+  - package-ecosystem: uv
     directories:
-      - "/integration-tests/cases/*"
+      - "/integration-tests/cases/04-uv-flat"
+      - "/integration-tests/cases/05-uv-src-vuln"
+      - "/integration-tests/cases/06-uv-multi-bandit"
+      - "/integration-tests/cases/12-uv-flat-bandit-only"
+      - "/integration-tests/cases/14-uv-low-threshold"
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     ignore:
