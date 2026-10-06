@@ -153,6 +153,17 @@ def check_audited(expected: dict[str, Any], pip_audit_path: Path | None) -> list
     return []
 
 
+def check_scanned(sarif_path: Path) -> list[str]:
+    """Error when a case (all of them run bandit) has no results.sarif.
+
+    The action deletes it when bandit did not run or skipped files, so a case
+    without one would otherwise pass as "no findings".
+    """
+    if sarif_path.exists():
+        return []
+    return ["bandit: no results.sarif (bandit did not run, or skipped files)"]
+
+
 # ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
@@ -277,6 +288,7 @@ def main() -> int:
         conclusion = conclusions.get(num, "missing")
         errors = validate_test(num, exp, conclusion, bandit_findings, pip_audit_findings)
         errors += check_audited(exp, pip_audit_path)
+        errors += check_scanned(sarif_path)
         all_errors[num] = errors
 
         status = "✅" if not errors else "❌"

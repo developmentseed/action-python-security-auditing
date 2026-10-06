@@ -13,7 +13,7 @@ action.yml                  ← GitHub Action entry point (composite steps)
 src/python_security_auditing/
   __main__.py               ← Orchestrator: settings → runners → report → comment → exit
   settings.py               ← Pydantic-based config from env vars (GitHub Action inputs)
-  runners.py                ← Tool invocation: SARIF parsing, pip-audit, package manager adapters
+  runners.py                ← Tool invocation: bandit and its SARIF, pip-audit, package manager adapters
   report.py                 ← Markdown report builder and threshold checker
   pr_comment.py             ← Upsert PR comment via `gh` CLI
 ```
@@ -22,7 +22,7 @@ src/python_security_auditing/
 
 **Key boundaries:**
 - `settings.py` — input/config boundary (reads env vars, validates via Pydantic)
-- `runners.py` — external tool boundary (subprocess calls to bandit SARIF, pip-audit, package managers)
+- `runners.py` — external tool boundary (subprocess calls to bandit, pip-audit, package managers)
 - `report.py` — pure logic (markdown generation, threshold checking — no I/O except step summary)
 - `pr_comment.py` — GitHub API boundary (subprocess calls to `gh` CLI)
 
@@ -30,7 +30,7 @@ src/python_security_auditing/
 
 - **Build system:** Hatch (`hatchling`)
 - **Python:** ≥ 3.13
-- **Dependencies:** `pydantic-settings`, `pip-audit`
+- **Dependencies:** `pydantic-settings`, `pip-audit`, `bandit[sarif]`
 - **Dev deps:** `pytest`, `pytest-mock`, `mypy` (strict), `ruff`
 
 ### Common Commands
@@ -68,7 +68,7 @@ uv run ruff format src/ tests/
 
 ## Key Design Decisions
 
-- **SARIF input for bandit:** Bandit runs in a separate composite step (`lhoupert/bandit-action`). This package only reads the SARIF output file — it does not invoke bandit directly.
+- **Bandit runs as a subprocess:** `run_bandit()` runs the bandit CLI as a subprocess (`python -m bandit`, from the package's own environment), writes `results.sarif` at the workspace root (artifact and Code Scanning upload), and reads it back. It fails closed: a crash or no file scanned raises `AuditError`; skipped files block the job and their SARIF is not uploaded.
 - **PR comment is idempotent:** Uses a hidden HTML marker (`<!-- security-scan-results -->`) to find and update the same comment on subsequent pushes.
 - **Threshold logic:** `check_thresholds()` in `report.py` returns a boolean; the orchestrator translates that to `sys.exit(1)`.
 - **Package manager adapters:** `generate_requirements()` normalizes all package managers to a `requirements.txt` file before passing to `pip-audit`.

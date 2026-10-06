@@ -7,6 +7,10 @@
           "name": "Bandit"
         }
       },
+      "invocations": [{ "executionSuccessful": true }],
+      "properties": {
+        "metrics": { "_totals": { "loc": 5 }, "./src/app.py": { "loc": 5 } }
+      },
       "results": [
         {
           "ruleId": "B404",

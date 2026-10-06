@@ -2,11 +2,30 @@
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from typing import Any
 
 from .settings import Settings
 
 _SEVERITY_ICON = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}
+_ENV_DIRS = {".venv", "venv", "site-packages", "node_modules"}
+
+
+def bandit_skipped_message(skipped: list[dict[str, Any]]) -> str:
+    """Explain which files bandit could not scan; list at most 20 (the PR comment is capped)."""
+    lines = [f"{e['filename']}: {e['reason']}" for e in skipped[:20]]
+    if len(skipped) > 20:
+        lines.append(f"… and {len(skipped) - 20} more")
+    if any(_ENV_DIRS.intersection(PurePath(e["filename"]).parts) for e in skipped):
+        lines.append("Some are in a virtual environment or node_modules inside bandit_scan_dirs.")
+    return (
+        f"bandit could not scan {len(skipped)} file(s), so their findings are missing and the "
+        "results were NOT uploaded to Code Scanning:\n"
+        + "\n".join(lines)
+        + "\nTo skip files on purpose, list them under `exclude` in your `.bandit` file. That "
+        "list replaces bandit's default excludes, so repeat them, for example: "
+        "`exclude = */.git/*,*/__pycache__/*,*/.tox/*,*/.eggs/*,*.egg,*/.venv/*,path/to/file.py`"
+    )
 
 
 def build_markdown(
@@ -14,6 +33,7 @@ def build_markdown(
     pip_audit_report: list[dict[str, Any]],
     settings: Settings,
     pip_audit_error: str = "",
+    bandit_error: str = "",
 ) -> str:
     """Build a full markdown security report."""
     sections: list[str] = ["# Security Audit Report\n"]
@@ -27,12 +47,14 @@ def build_markdown(
         sections.append(f"[View workflow run]({run_url})\n")
 
     if "bandit" in settings.enabled_tools:
-        sections.append(_bandit_section(bandit_report, settings))
+        sections.append(_bandit_section(bandit_report, settings, bandit_error))
 
     if "pip-audit" in settings.enabled_tools:
         sections.append(_pip_audit_section(pip_audit_report, settings, pip_audit_error))
 
-    blocking = check_thresholds(bandit_report, pip_audit_report, settings) or bool(pip_audit_error)
+    blocking = check_thresholds(bandit_report, pip_audit_report, settings) or bool(
+        bandit_error or pip_audit_error
+    )
     sections.append("---\n")
     if blocking:
         sections.append("**Result: ❌ Blocking issues found — see details above.**\n")
@@ -42,7 +64,7 @@ def build_markdown(
     return "\n".join(sections)
 
 
-def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
+def _bandit_section(report: dict[str, Any], settings: Settings, error: str) -> str:
     results: list[dict[str, Any]] = report.get("results", [])
     security_url = (
         f"https://github.com/{settings.github_repository}/security/code-scanning"
@@ -55,6 +77,15 @@ def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
         else "## Bandit — Static Security Analysis\n"
     )
     lines = [heading]
+
+    if error:
+        lines.append(f"❌ bandit did NOT run, so the code was NOT scanned.\n\n```\n{error}\n```\n")
+        return "\n".join(lines)
+
+    if skipped := report.get("errors", []):
+        lines.append(f"❌ The scan is incomplete.\n\n```\n{bandit_skipped_message(skipped)}\n```\n")
+    if report.get("files_read", 0) is None:
+        lines.append("⚠️ Number of files scanned unknown: bandit reported no file metrics.\n")
 
     if not results:
         lines.append("✅ No issues found.\n")
@@ -160,6 +191,8 @@ def check_thresholds(
 ) -> bool:
     """Return True if any blocking issues were found."""
     if "bandit" in settings.enabled_tools:
+        if bandit_report.get("errors"):  # files bandit could not scan
+            return True
         for result in bandit_report.get("results", []):
             if result.get("issue_severity") in settings.blocking_severities:
                 return True

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Any
 
 from .annotations import emit_annotations
@@ -13,7 +12,7 @@ from .runners import (
     PIP_AUDIT_REPORT,
     AuditError,
     generate_requirements,
-    read_bandit_sarif,
+    run_bandit,
     run_pip_audit,
 )
 from .settings import Settings
@@ -27,14 +26,14 @@ def main() -> None:
 
     bandit_report: dict[str, Any] = {}
     pip_audit_report: list[dict[str, Any]] = []
+    bandit_error = ""
     pip_audit_error = ""
 
     if "bandit" in settings.enabled_tools:
-        if settings.debug:
-            print(
-                f"[debug] reading bandit SARIF from {settings.bandit_sarif_path}", file=sys.stderr
-            )
-        bandit_report = read_bandit_sarif(Path(settings.bandit_sarif_path))
+        try:
+            bandit_report = run_bandit(settings)
+        except AuditError as exc:
+            bandit_error = str(exc)
         if settings.debug:
             print(
                 f"[debug] bandit findings: {len(bandit_report.get('results', []))}", file=sys.stderr
@@ -57,11 +56,13 @@ def main() -> None:
         if settings.debug:
             print(f"[debug] pip-audit findings: {len(pip_audit_report)}", file=sys.stderr)
 
-    markdown = build_markdown(bandit_report, pip_audit_report, settings, pip_audit_error)
+    markdown = build_markdown(
+        bandit_report, pip_audit_report, settings, pip_audit_error, bandit_error
+    )
     write_step_summary(markdown, settings)
-    emit_annotations(bandit_report, pip_audit_report, settings, pip_audit_error)
+    emit_annotations(bandit_report, pip_audit_report, settings, pip_audit_error, bandit_error)
 
-    has_blocking = bool(pip_audit_error) or check_thresholds(
+    has_blocking = bool(bandit_error or pip_audit_error) or check_thresholds(
         bandit_report, pip_audit_report, settings
     )
 
@@ -69,8 +70,15 @@ def main() -> None:
         if settings.comment_on == "always" or has_blocking:
             upsert_pr_comment(markdown, settings)
 
+    failures = []
+    if bandit_error:
+        failures.append(f"bandit did NOT run, so the code was NOT scanned.\n{bandit_error}")
     if pip_audit_error:
-        sys.exit(f"pip-audit did NOT run, so dependencies were NOT audited.\n{pip_audit_error}")
+        failures.append(
+            f"pip-audit did NOT run, so dependencies were NOT audited.\n{pip_audit_error}"
+        )
+    if failures:
+        sys.exit("\n".join(failures))
     if has_blocking:
         sys.exit(1)
 
