@@ -10,7 +10,7 @@
 - MEDIUM severity threshold (lower than default HIGH) catches B324 and B506
 - `uv export` produces clean deps — no pip-audit failures
 - `pip_audit_block_on: none` ensures only bandit can fail this job
-- `uv.lock` is committed — tests the action with a pre-existing lockfile
+- `uv.lock` is **not committed**: CI generates it (`uv lock`), so the case audits the latest releases
 
 ## Intentional issues
 

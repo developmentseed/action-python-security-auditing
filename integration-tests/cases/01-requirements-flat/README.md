@@ -6,7 +6,7 @@
 
 ## What this tests
 
-- Basic `requirements.txt` with pinned safe versions
+- Basic `requirements.txt` with minimum versions (`>=`), so it audits the latest releases
 - Bandit scans the flat project directory (no src/ subdirectory)
 - pip-audit finds no vulnerabilities
 
