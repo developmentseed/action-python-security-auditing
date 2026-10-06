@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/developmentseed/action-python-security-auditing/compare/v0.6.1...v1.0.0) (2026-10-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* run bandit in the action's Python module instead of the bandit-action fork ([#87](https://github.com/developmentseed/action-python-security-auditing/issues/87))
+* fail closed when pip-audit cannot run; reject package_manager pip ([#85](https://github.com/developmentseed/action-python-security-auditing/issues/85))
+
+### Bug Fixes
+
+* fail closed when pip-audit cannot run; reject package_manager pip ([#85](https://github.com/developmentseed/action-python-security-auditing/issues/85)) ([3f6afd3](https://github.com/developmentseed/action-python-security-auditing/commit/3f6afd31bde894437e03b12bcc567a2addd09362))
+* run bandit in the action's Python module instead of the bandit-action fork ([#87](https://github.com/developmentseed/action-python-security-auditing/issues/87)) ([4242e5a](https://github.com/developmentseed/action-python-security-auditing/commit/4242e5a92ff6dd31bec4cfc10a788fe7ed5a9052))
+
 ## [0.6.1](https://github.com/developmentseed/action-python-security-auditing/compare/v0.6.0...v0.6.1) (2026-10-06)
 
 
