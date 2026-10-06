@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -273,6 +274,9 @@ def test_generate_requirements_raises_when_export_fails(
     monkeypatch.chdir(tmp_path)
     (tmp_path / "Pipfile.lock").write_text("{}")
     monkeypatch.setenv("PACKAGE_MANAGER", package_manager)
+    tmpdir = tmp_path / "tmp"
+    tmpdir.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmpdir))
     exc = subprocess.CalledProcessError(2, package_manager, stderr="lockfile is broken")
     # poetry first runs `poetry self add`, which may fail without consequence
     side_effect = [MagicMock(returncode=1), exc] if package_manager == "poetry" else exc
@@ -282,6 +286,7 @@ def test_generate_requirements_raises_when_export_fails(
     ):
         with pytest.raises(AuditError, match=f"{package_manager} .*failed: lockfile is broken"):
             generate_requirements(Settings())
+    assert list(tmpdir.iterdir()) == []  # no leaked temp requirements file
 
 
 def test_generate_requirements_pipenv_raises_without_lockfile(
@@ -294,6 +299,24 @@ def test_generate_requirements_pipenv_raises_without_lockfile(
         with pytest.raises(AuditError, match="Pipfile.lock not found"):
             generate_requirements(Settings())
     mock_run.assert_not_called()
+
+
+def test_generate_requirements_pipenv_uses_lockfile_next_to_pipenv_pipfile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """pipenv keeps the lock at <PIPENV_PIPFILE>.lock, not in the current directory."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "Pipfile.lock").write_text("{}")
+    monkeypatch.setenv("PIPENV_PIPFILE", str(tmp_path / "sub" / "Pipfile"))
+    monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
+    with (
+        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
+        patch("python_security_auditing.runners.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(returncode=0, stdout="requests==2.31.0\n")
+        result = generate_requirements(Settings())
+    assert result.read_text() == "requests==2.31.0\n"
 
 
 # ---------------------------------------------------------------------------

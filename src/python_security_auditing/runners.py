@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -47,13 +48,22 @@ def generate_requirements(settings: Settings) -> Path:
             raise AuditError(f"requirements file not found: {path}")
         return path
 
+    if pm == "pipenv":
+        # pipenv keeps the lock at <Pipfile>.lock. Without it, `pipenv requirements`
+        # exits 0 and prints no packages.
+        lock = Path(os.environ.get("PIPENV_PIPFILE", "Pipfile") + ".lock")
+        if not lock.is_file():
+            raise AuditError(f"{lock} not found: commit it or run `pipenv lock` first.")
+
+    # Check everything that can fail before creating the temp file, so it is not leaked.
+    exe = _resolve_exe(pm)
     tmp = tempfile.NamedTemporaryFile(suffix="-requirements.txt", delete=False, mode="w")
     tmp.close()
     out_path = Path(tmp.name)
 
     if pm == "uv":
         cmd = [
-            _resolve_exe("uv"),
+            exe,
             "export",
             "--format",
             "requirements-txt",
@@ -72,6 +82,7 @@ def generate_requirements(settings: Settings) -> Path:
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
+            out_path.unlink()
             raise AuditError(f"uv export failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
@@ -81,7 +92,7 @@ def generate_requirements(settings: Settings) -> Path:
     elif pm == "poetry":
         # poetry-plugin-export is bundled in Poetry 1.8+; ignore failure here
         subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
-            [_resolve_exe("poetry"), "self", "add", "poetry-plugin-export"],
+            [exe, "self", "add", "poetry-plugin-export"],
             check=False,
             capture_output=True,
             text=True,
@@ -89,7 +100,7 @@ def generate_requirements(settings: Settings) -> Path:
         try:
             subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
                 [
-                    _resolve_exe("poetry"),
+                    exe,
                     "export",
                     "--format",
                     "requirements.txt",
@@ -102,6 +113,7 @@ def generate_requirements(settings: Settings) -> Path:
                 text=True,
             )
         except subprocess.CalledProcessError as exc:
+            out_path.unlink()
             raise AuditError(f"poetry export failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
@@ -109,15 +121,13 @@ def generate_requirements(settings: Settings) -> Path:
                 file=sys.stderr,
             )
     elif pm == "pipenv":
-        # Without a lockfile, `pipenv requirements` exits 0 and prints no packages.
-        if not Path("Pipfile.lock").is_file():
-            raise AuditError("Pipfile.lock not found: commit it or run `pipenv lock` first.")
         try:
             result = subprocess.run(  # nosec B603,B605 -- list args, full path via _resolve_exe()
-                [_resolve_exe("pipenv"), "requirements"], capture_output=True, text=True, check=True
+                [exe, "requirements"], capture_output=True, text=True, check=True
             )
             out_path.write_text(result.stdout)
         except subprocess.CalledProcessError as exc:
+            out_path.unlink()
             raise AuditError(f"pipenv requirements failed: {exc.stderr.strip()}") from exc
         if settings.debug:
             print(
