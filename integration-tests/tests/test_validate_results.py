@@ -290,6 +290,26 @@ class TestCheckAudited:
 
 
 # ---------------------------------------------------------------------------
+# check_scanned
+# ---------------------------------------------------------------------------
+
+
+class TestCheckScanned:
+    """The action deletes results.sarif when bandit did not run or skipped files."""
+
+    def test_missing_sarif_returns_error(self, tmp_path: Path) -> None:
+        errors = vr.check_scanned(tmp_path / "results.sarif")
+
+        assert any("no results.sarif" in e for e in errors)
+
+    def test_present_sarif_returns_no_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "results.sarif"
+        path.write_text(json.dumps({"runs": [{"results": []}]}))
+
+        assert vr.check_scanned(path) == []
+
+
+# ---------------------------------------------------------------------------
 # generate_report
 # ---------------------------------------------------------------------------
 
