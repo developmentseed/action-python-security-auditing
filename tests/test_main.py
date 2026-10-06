@@ -12,18 +12,12 @@ from python_security_auditing.__main__ import main
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+CLEAN_REPORT = '{"dependencies": [{"name": "requests", "version": "2.32.0", "vulns": []}]}'
+
+
 def _clean_audit(cmd: list[str], **kwargs: object) -> MagicMock:
     """uv export succeeds and pip-audit reports no vulnerabilities."""
-    return MagicMock(returncode=0, stderr="", stdout='{"dependencies": [], "fixes": []}')
-
-
-def _make_sarif_mock(sarif_content: str, pip_stdout: str = "[]") -> object:
-    """Return a mock_subprocess factory that feeds a SARIF file and pip-audit output."""
-
-    def mock_subprocess(cmd: list[str], **kwargs: object) -> MagicMock:
-        return MagicMock(returncode=0, stderr="", stdout=pip_stdout)
-
-    return mock_subprocess
+    return MagicMock(returncode=0, stderr="", stdout=CLEAN_REPORT)
 
 
 def test_comment_on_never_never_calls_upsert(
