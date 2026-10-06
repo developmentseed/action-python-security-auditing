@@ -113,7 +113,7 @@ class Settings(BaseSettings):
 
     @property
     def enabled_tools(self) -> list[str]:
-        return [t.strip() for t in self.tools.split(",") if t.strip()]
+        return self.tools.split(",")  # normalized by _known_tools
 
     @property
     def blocking_severities(self) -> list[str]:
