@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -219,6 +220,23 @@ def test_read_bandit_sarif_tolerates_missing_bandit_details(tmp_path: Path) -> N
     assert report["files_read"] is None  # unknown
 
 
+@pytest.mark.parametrize(
+    "run",
+    [
+        {"results": None},
+        {"results": [1]},
+        {"results": [{"locations": [{"physicalLocation": {"artifactLocation": {"uri": 5}}}]}]},
+        {"results": [], "properties": {"metrics": 5}},
+    ],
+)
+def test_read_bandit_sarif_raises_on_malformed_values(tmp_path: Path, run: dict[str, Any]) -> None:
+    """A malformed report must not crash the run before pip-audit, nor reach Code Scanning."""
+    sarif_path = tmp_path / "results.sarif"
+    sarif_path.write_text(json.dumps({"runs": [run]}))
+    with pytest.raises(AuditError, match="bandit wrote no valid SARIF report"):
+        read_bandit_sarif(sarif_path)
+
+
 # ---------------------------------------------------------------------------
 # run_bandit
 # ---------------------------------------------------------------------------
@@ -244,25 +262,23 @@ def test_run_bandit_builds_command_from_workspace_root(
     monkeypatch.chdir(tmp_path / "proj")  # working_directory
     sarif_path = tmp_path / "results.sarif"
     monkeypatch.setenv("GITHUB_WORKSPACE", str(tmp_path))
-    monkeypatch.setenv("BANDIT_SCAN_DIRS", "src/, scripts,.")
+    monkeypatch.setenv("BANDIT_SCAN_DIRS", "src/, scripts")
     monkeypatch.setenv("BANDIT_SARIF_PATH", str(sarif_path))
 
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch(
-            "python_security_auditing.runners.subprocess.run",
-            side_effect=_fake_bandit(_bandit_sarif()),
-        ) as mock_run,
-    ):
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=_fake_bandit(_bandit_sarif()),
+    ) as mock_run:
         run_bandit(Settings())
 
-    cmd = mock_run.call_args[0][0]
-    assert cmd == [
+    # the bandit of the action's own environment, never one found on PATH
+    assert mock_run.call_args[0][0] == [
+        sys.executable,
+        "-m",
         "bandit",
         "-r",
         "proj/src",
         "proj/scripts",
-        "proj",
         "-f",
         "sarif",
         "-o",
@@ -272,19 +288,40 @@ def test_run_bandit_builds_command_from_workspace_root(
     assert mock_run.call_args.kwargs["cwd"] == tmp_path.resolve()
 
 
+@pytest.mark.parametrize(
+    ("dirs", "targets"),
+    [
+        ("src, ., ./src/, scripts", ["."]),
+        ("src/sub, src, scripts, src/", ["src", "scripts"]),
+    ],
+)
+def test_run_bandit_scans_overlapping_dirs_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dirs: str, targets: list[str]
+) -> None:
+    """bandit would report the files of overlapping dirs twice, under different paths."""
+    (tmp_path / "src/sub").mkdir(parents=True)
+    (tmp_path / "scripts").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("BANDIT_SCAN_DIRS", dirs)
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=_fake_bandit(_bandit_sarif()),
+    ) as mock_run:
+        run_bandit(Settings())
+    cmd = mock_run.call_args[0][0]
+    assert cmd[4 : cmd.index("-f")] == targets
+
+
 def test_run_bandit_defaults_to_the_working_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch(
-            "python_security_auditing.runners.subprocess.run",
-            side_effect=_fake_bandit(_bandit_sarif()),
-        ) as mock_run,
-    ):
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=_fake_bandit(_bandit_sarif()),
+    ) as mock_run:
         run_bandit(Settings())
-    assert mock_run.call_args[0][0][1:3] == ["-r", "."]
+    assert mock_run.call_args[0][0][3:5] == ["-r", "."]
     assert mock_run.call_args.kwargs["cwd"] == tmp_path.resolve()
 
 
@@ -301,13 +338,31 @@ def test_run_bandit_returns_findings(
 ) -> None:
     """With --exit-zero, bandit exits 0 when it finds issues; the SARIF is kept for upload."""
     monkeypatch.chdir(tmp_path)
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run", side_effect=_fake_bandit(sarif)),
-    ):
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=_fake_bandit(sarif)):
         report = run_bandit(Settings())
     assert [r["test_id"] for r in report["results"]] == ["B404", "B602"]
     assert (tmp_path / "results.sarif").read_text() == sarif
+
+
+def test_run_bandit_keeps_findings_when_files_are_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The findings of the other files are reported; the partial SARIF is not uploaded."""
+    monkeypatch.chdir(tmp_path)
+    issues = json.loads((FIXTURES / "bandit_issues.sarif").read_text())["runs"][0]["results"]
+    sarif = _bandit_sarif(
+        results=tuple(issues),
+        files=("./src/app.py", "./new.py"),
+        skipped=(("new.py", "syntax error while parsing AST from file"),),
+    )
+    with patch("python_security_auditing.runners.subprocess.run", side_effect=_fake_bandit(sarif)):
+        report = run_bandit(Settings())
+    assert [r["test_id"] for r in report["results"]] == ["B404", "B602"]
+    assert report["errors"] == [
+        {"filename": "new.py", "reason": "syntax error while parsing AST from file"}
+    ]
+    # a partial report would close the skipped file's Code Scanning alerts
+    assert not (tmp_path / "results.sarif").exists()
 
 
 @pytest.mark.parametrize(
@@ -319,18 +374,8 @@ def test_run_bandit_returns_findings(
         (None, 1, "Traceback (most recent call last):", r"exit 1\):\nTraceback"),
         (None, 0, "", "bandit wrote no valid SARIF report"),
         ("not json", 0, "", "bandit wrote no valid SARIF report"),
+        ('{"runs": [{"results": null}]}', 0, "", "bandit wrote no valid SARIF report"),
         (_bandit_sarif(files=()), 0, "", r"no Python file to scan in \['.'\]"),
-        # a skipped file would drop its findings, and close its Code Scanning alerts
-        (
-            _bandit_sarif(
-                files=("./app.py", "./new.py"),
-                skipped=(("new.py", "syntax error while parsing AST from file"),),
-            ),
-            0,
-            "",
-            r"could not scan 1 file\(s\), so they were NOT checked:\n"
-            r"new.py: syntax error while parsing AST from file\n.*`exclude`.*`.bandit`",
-        ),
     ],
 )
 def test_run_bandit_fails_closed(
@@ -341,39 +386,32 @@ def test_run_bandit_fails_closed(
     stderr: str,
     message: str,
 ) -> None:
-    """A failed, partial or empty scan raises, and leaves no SARIF to upload."""
+    """A failed or empty scan raises, and leaves no SARIF to upload."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "results.sarif").write_text(_bandit_sarif())  # an earlier run's report
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch(
-            "python_security_auditing.runners.subprocess.run",
-            side_effect=_fake_bandit(sarif, returncode, stderr),
-        ),
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=_fake_bandit(sarif, returncode, stderr),
     ):
         with pytest.raises(AuditError, match=message):
             run_bandit(Settings())
     assert not (tmp_path / "results.sarif").exists()
 
 
-def test_run_bandit_caps_the_skipped_file_list(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The list ends up in the PR comment, which GitHub caps at 65,536 characters."""
+def test_run_bandit_truncates_long_stderr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """stderr ends up in the PR comment, which GitHub caps at 65,536 characters."""
     monkeypatch.chdir(tmp_path)
-    skipped = tuple((f"f{i}.py", "syntax error while parsing AST from file") for i in range(25))
-    sarif = _bandit_sarif(files=tuple(f"./f{i}.py" for i in range(25)), skipped=skipped)
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run", side_effect=_fake_bandit(sarif)),
+    stderr = "x" * 10_000 + "\nValueError: the real cause"
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=_fake_bandit(None, 1, stderr),
     ):
         with pytest.raises(AuditError) as exc_info:
             run_bandit(Settings())
     message = str(exc_info.value)
-    assert "could not scan 25 file(s)" in message
-    assert "f19.py:" in message
-    assert "f20.py:" not in message
-    assert "… and 5 more" in message
+    assert len(message) < 2_100
+    assert "… (truncated)" in message
+    assert message.endswith("ValueError: the real cause")
 
 
 def test_run_bandit_rejects_missing_scan_dirs(
@@ -394,12 +432,9 @@ def test_run_bandit_rejects_missing_scan_dirs(
 def test_run_bandit_wraps_os_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """An OSError must not crash the run before pip-audit and the summary."""
     monkeypatch.chdir(tmp_path)
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch(
-            "python_security_auditing.runners.subprocess.run",
-            side_effect=PermissionError(13, "Permission denied"),
-        ),
+    with patch(
+        "python_security_auditing.runners.subprocess.run",
+        side_effect=PermissionError(13, "Permission denied"),
     ):
         with pytest.raises(AuditError, match="bandit could not run: .*Permission denied"):
             run_bandit(Settings())

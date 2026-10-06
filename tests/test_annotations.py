@@ -147,6 +147,16 @@ def test_bandit_without_file_metrics_warns(
     assert capsys.readouterr().out.startswith("::warning::bandit reported no file metrics")
 
 
+def test_bandit_skipped_files_emit_error(
+    pip_clean: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = {"results": [], "errors": [{"filename": "src/new.py", "reason": "syntax error"}]}
+    emit_annotations(report, pip_clean, Settings())
+    out = capsys.readouterr().out
+    assert out.startswith("::error::bandit could not scan 1 file(s)")
+    assert "%0Asrc/new.py: syntax error%0A" in out
+
+
 def test_bandit_only_tool_skips_pip(
     bandit_clean: dict[str, Any],
     pip_fixable: list[Any],

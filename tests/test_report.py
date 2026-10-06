@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from python_security_auditing.report import build_markdown, check_thresholds, write_step_summary
+from python_security_auditing.report import (
+    bandit_skipped_message,
+    build_markdown,
+    check_thresholds,
+    write_step_summary,
+)
 from python_security_auditing.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -226,6 +231,49 @@ def test_markdown_bandit_error(pip_fixable: list[Any]) -> None:
     assert "No issues found" not in md
     assert "requests" in md  # pip-audit results are still shown
     assert "Blocking issues found" in md
+
+
+SKIPPED = [{"filename": "src/new.py", "reason": "syntax error while parsing AST from file"}]
+
+
+def test_markdown_bandit_skipped_files_keep_findings_and_block(
+    bandit_issues: dict[str, Any], pip_clean: list[Any]
+) -> None:
+    md = build_markdown({**bandit_issues, "errors": SKIPPED}, pip_clean, Settings())
+    assert "bandit could not scan 1 file(s)" in md
+    assert "NOT uploaded to Code Scanning" in md
+    assert "src/new.py: syntax error while parsing AST from file" in md
+    assert "B404" in md  # the other files' findings are still reported
+    assert "Blocking issues found" in md
+
+
+def test_bandit_skipped_files_block_below_threshold(
+    bandit_clean: dict[str, Any], pip_clean: list[Any]
+) -> None:
+    assert check_thresholds({**bandit_clean, "errors": SKIPPED}, pip_clean, Settings()) is True
+
+
+def test_bandit_skipped_message_is_capped_and_points_at_a_venv() -> None:
+    skipped = [{"filename": f".venv/lib/f{i}.py", "reason": "syntax error"} for i in range(25)]
+    message = bandit_skipped_message(skipped)
+    assert "could not scan 25 file(s)" in message
+    assert ".venv/lib/f19.py: syntax error" in message
+    assert ".venv/lib/f20.py" not in message
+    assert "… and 5 more" in message
+    assert "virtual environment" in message
+    # bandit's own default excludes are replaced by an `exclude` list, so it repeats them
+    assert "exclude = */.git/*,*/__pycache__/*,*/.tox/*,*/.eggs/*,*.egg,*/.venv/*," in message
+
+
+def test_bandit_skipped_message_without_venv_has_no_venv_hint() -> None:
+    assert "virtual environment" not in bandit_skipped_message(SKIPPED)
+
+
+def test_markdown_bandit_unknown_file_count(
+    bandit_clean: dict[str, Any], pip_clean: list[Any]
+) -> None:
+    md = build_markdown({**bandit_clean, "files_read": None}, pip_clean, Settings())
+    assert "⚠️ Number of files scanned unknown" in md
 
 
 def test_markdown_run_url(

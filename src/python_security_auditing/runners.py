@@ -155,7 +155,7 @@ def read_bandit_sarif(sarif_path: Path) -> dict[str, Any]:
 
     "errors" lists the files bandit skipped. "files_read" counts the files bandit read, or is
     None when the report has no per-file metrics. Raises AuditError when the report is
-    missing or is not SARIF.
+    missing or malformed.
     """
     try:
         run: dict[str, Any] = json.loads(sarif_path.read_text())["runs"][0]
@@ -167,62 +167,68 @@ def read_bandit_sarif(sarif_path: Path) -> dict[str, Any]:
             uri = phys.get("artifactLocation", {}).get("uri", "")
             errors.append({"filename": unquote(uri), "reason": notice["message"]["text"]})
         metrics = run.get("properties", {}).get("metrics")
+        files_read = None if metrics is None else len(set(metrics) - {"_totals"})
+
+        results: list[dict[str, Any]] = []
+        for sarif_result in run.get("results", []):
+            props: dict[str, Any] = sarif_result.get("properties", {})
+            severity = props.get("issue_severity") or _SARIF_LEVEL_TO_SEVERITY.get(
+                sarif_result.get("level", "none"), "LOW"
+            )
+            locations: list[dict[str, Any]] = sarif_result.get("locations", [])
+            filename = ""
+            line_number = 0
+            if locations:
+                phys = locations[0].get("physicalLocation", {})
+                filename = unquote(phys.get("artifactLocation", {}).get("uri", ""))  # %-encoded
+                line_number = phys.get("region", {}).get("startLine", 0)
+            results.append(
+                {
+                    "issue_severity": severity,
+                    "issue_confidence": props.get("issue_confidence", ""),
+                    "issue_text": sarif_result.get("message", {}).get("text", ""),
+                    "filename": filename,
+                    "line_number": line_number,
+                    "test_id": sarif_result.get("ruleId", ""),
+                }
+            )
     except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
         raise AuditError(f"bandit wrote no valid SARIF report to {sarif_path}: {exc!r}") from exc
 
-    results: list[dict[str, Any]] = []
-    for sarif_result in run.get("results", []):
-        props: dict[str, Any] = sarif_result.get("properties", {})
-        severity = props.get("issue_severity") or _SARIF_LEVEL_TO_SEVERITY.get(
-            sarif_result.get("level", "none"), "LOW"
-        )
-        locations: list[dict[str, Any]] = sarif_result.get("locations", [])
-        filename = ""
-        line_number = 0
-        if locations:
-            phys = locations[0].get("physicalLocation", {})
-            filename = unquote(phys.get("artifactLocation", {}).get("uri", ""))  # bandit %-encodes
-            line_number = phys.get("region", {}).get("startLine", 0)
-        results.append(
-            {
-                "issue_severity": severity,
-                "issue_confidence": props.get("issue_confidence", ""),
-                "issue_text": sarif_result.get("message", {}).get("text", ""),
-                "filename": filename,
-                "line_number": line_number,
-                "test_id": sarif_result.get("ruleId", ""),
-            }
-        )
-
-    files_read = None if metrics is None else len(set(metrics) - {"_totals"})
     return {"results": results, "errors": errors, "files_read": files_read}
 
 
 def run_bandit(settings: Settings) -> dict[str, Any]:
     """Run bandit on bandit_scan_dirs, write its SARIF report, return the parsed report.
 
-    Raises AuditError, and leaves no SARIF report, when bandit cannot run, fails, skips a
-    file or reads none: an empty or partial report would close open Code Scanning alerts.
+    Raises AuditError when bandit cannot run, fails or reads no file. The SARIF report is
+    kept only when bandit scanned every file: an empty or partial report would close open
+    Code Scanning alerts.
     """
     sarif_path = Path(settings.bandit_sarif_path).resolve()
+    complete = False
     try:
         sarif_path.unlink(missing_ok=True)  # never upload an earlier run's report
         dirs = [d.strip() for d in settings.bandit_scan_dirs.split(",") if d.strip()]
         missing = [d for d in dirs if not Path(d).exists()]
         if missing:
             raise AuditError(f"bandit_scan_dirs not found in {Path.cwd()}: {', '.join(missing)}")
+        # bandit reports the files of overlapping dirs twice: drop repeated and nested dirs.
+        paths = list(dict.fromkeys(Path(d).resolve() for d in dirs))
+        paths = [p for p in paths if not any(p != q and p.is_relative_to(q) for q in paths)]
         # Run from the repository root, so that SARIF paths (annotations, Code Scanning)
         # stay relative to it whatever the working directory.
         root = Path(settings.github_workspace or ".").resolve()
-        targets = [os.path.relpath(Path(d).resolve(), root) for d in dirs]
-        # With --exit-zero findings exit 0 too, so any other exit is a crash or a usage error.
-        cmd = [_resolve_exe("bandit"), "-r", *targets, "-f", "sarif", "-o", str(sarif_path)]
-        cmd += ["--exit-zero"]
+        targets = [os.path.relpath(p, root) for p in paths]
+        # The bandit of this environment, not one on PATH. With --exit-zero, findings exit 0
+        # too, so any other exit is a crash or a usage error.
+        cmd = [sys.executable, "-m", "bandit", "-r", *targets]
+        cmd += ["-f", "sarif", "-o", str(sarif_path), "--exit-zero"]
 
         if settings.debug:
             print(f"[debug] bandit command (cwd={root}): {cmd}", file=sys.stderr)
 
-        result = subprocess.run(cmd, cwd=root, capture_output=True, text=True)  # nosec B603 -- list args, full path via _resolve_exe()
+        result = subprocess.run(cmd, cwd=root, capture_output=True, text=True)  # nosec B603 -- list args, sys.executable
 
         if settings.debug:
             print(
@@ -230,27 +236,21 @@ def run_bandit(settings: Settings) -> dict[str, Any]:
             )
 
         if result.returncode:
-            raise AuditError(f"bandit failed (exit {result.returncode}):\n{result.stderr.strip()}")
+            stderr = result.stderr.strip()
+            if len(stderr) > 2000:  # it ends up in the PR comment, capped at 65,536 characters
+                stderr = "… (truncated)\n" + stderr[-2000:]
+            raise AuditError(f"bandit failed (exit {result.returncode}):\n{stderr}")
         report = read_bandit_sarif(sarif_path)
-        if skipped := [f"{e['filename']}: {e['reason']}" for e in report["errors"]]:
-            count = len(skipped)
-            if count > 20:  # the list ends up in the PR comment, which GitHub caps at 65,536 chars
-                skipped[20:] = [f"… and {count - 20} more"]
-            raise AuditError(
-                f"bandit could not scan {count} file(s), so they were NOT checked:\n"
-                + "\n".join(skipped)
-                + "\nFix them, or skip them on purpose: list them under `exclude` in the [bandit] "
-                "section of a `.bandit` file in a scanned directory."
-            )
-        if report["files_read"] == 0:
+        if report["files_read"] == 0 and not report["errors"]:
             raise AuditError(f"bandit found no Python file to scan in {targets}")
-    except (AuditError, OSError) as exc:
-        with contextlib.suppress(OSError):
-            sarif_path.unlink(missing_ok=True)
-        if isinstance(exc, AuditError):
-            raise
+        complete = not report["errors"]
+        return report
+    except OSError as exc:
         raise AuditError(f"bandit could not run: {exc}") from exc
-    return report
+    finally:
+        if not complete:
+            with contextlib.suppress(OSError):
+                sarif_path.unlink(missing_ok=True)
 
 
 def run_pip_audit(

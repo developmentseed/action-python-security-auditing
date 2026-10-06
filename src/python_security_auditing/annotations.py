@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .report import bandit_skipped_message
 from .settings import Settings
 
 _SEVERITY_TO_LEVEL: dict[str, str] = {
@@ -40,7 +41,9 @@ def emit_annotations(
     if "bandit" in settings.enabled_tools:
         if bandit_error:
             print(f"::error::bandit did NOT run: {_escape(bandit_error)}")
-        elif bandit_report.get("files_read", 0) is None:
+        if bandit_report.get("errors"):
+            print(f"::error::{_escape(bandit_skipped_message(bandit_report['errors']))}")
+        if bandit_report.get("files_read", 0) is None:
             print(
                 "::warning::bandit reported no file metrics, so the scanned file count is unknown"
             )

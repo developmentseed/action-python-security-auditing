@@ -32,7 +32,7 @@ def main() -> None:
     if "bandit" in settings.enabled_tools:
         try:
             bandit_report = run_bandit(settings)
-        except (AuditError, FileNotFoundError) as exc:
+        except AuditError as exc:
             bandit_error = str(exc)
         if settings.debug:
             print(
