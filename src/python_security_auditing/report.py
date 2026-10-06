@@ -14,6 +14,7 @@ def build_markdown(
     pip_audit_report: list[dict[str, Any]],
     settings: Settings,
     pip_audit_error: str = "",
+    bandit_error: str = "",
 ) -> str:
     """Build a full markdown security report."""
     sections: list[str] = ["# Security Audit Report\n"]
@@ -27,12 +28,14 @@ def build_markdown(
         sections.append(f"[View workflow run]({run_url})\n")
 
     if "bandit" in settings.enabled_tools:
-        sections.append(_bandit_section(bandit_report, settings))
+        sections.append(_bandit_section(bandit_report, settings, bandit_error))
 
     if "pip-audit" in settings.enabled_tools:
         sections.append(_pip_audit_section(pip_audit_report, settings, pip_audit_error))
 
-    blocking = check_thresholds(bandit_report, pip_audit_report, settings) or bool(pip_audit_error)
+    blocking = check_thresholds(bandit_report, pip_audit_report, settings) or bool(
+        bandit_error or pip_audit_error
+    )
     sections.append("---\n")
     if blocking:
         sections.append("**Result: ❌ Blocking issues found — see details above.**\n")
@@ -42,7 +45,7 @@ def build_markdown(
     return "\n".join(sections)
 
 
-def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
+def _bandit_section(report: dict[str, Any], settings: Settings, error: str) -> str:
     results: list[dict[str, Any]] = report.get("results", [])
     security_url = (
         f"https://github.com/{settings.github_repository}/security/code-scanning"
@@ -55,6 +58,10 @@ def _bandit_section(report: dict[str, Any], settings: Settings) -> str:
         else "## Bandit — Static Security Analysis\n"
     )
     lines = [heading]
+
+    if error:
+        lines.append(f"❌ bandit did NOT run, so the code was NOT scanned.\n\n```\n{error}\n```\n")
+        return "\n".join(lines)
 
     if not results:
         lines.append("✅ No issues found.\n")

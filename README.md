@@ -161,7 +161,7 @@ permissions:
   security-events: write
 ```
 
-If you don't need Code Scanning integration, `contents: read` alone is sufficient.
+If you don't need Code Scanning integration, `contents: read` alone is sufficient: the SARIF upload then fails without failing the job.
 
 ## Usage examples
 
@@ -211,6 +211,10 @@ When your source code spans more than one directory, pass a comma-separated list
     package_manager: uv
     bandit_scan_dirs: 'src/,scripts/'
 ```
+
+### Configuring bandit
+
+Bandit honours a `.bandit` file (INI, `[bandit]` section, for example `exclude` or `skips`) placed in a scanned directory. `[tool.bandit]` in `pyproject.toml` is not read. Bandit runs on Python 3.13, and a file it cannot parse fails the job, because its findings would otherwise go unreported. To skip such a file on purpose, list it under `exclude`.
 
 ### Project in a subdirectory (monorepo)
 
@@ -343,8 +347,8 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 - **Annotations** — always emitted. Bandit findings appear as inline annotations on the PR "Files changed" tab (keyed to file and line). pip-audit findings appear as summary-level annotations. No email notifications are generated.
 - **Step summary** — the full report is written to the workflow run summary, visible under the "Summary" tab.
 - **PR comment** — opt-in via `comment_on: blocking` or `comment_on: always`. Created on first run, updated in place on every subsequent run. The comment is keyed on a hidden `<!-- security-scan-results::{workflow-name} -->` marker, so multiple workflows on the same PR each maintain their own separate comment.
-- **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps. The `results.sarif` file is the bandit SARIF report; it is also uploaded to GitHub Code Scanning automatically by the underlying `lhoupert/bandit-action` step, making findings visible in the repository's Security tab when the job has `security-events: write` permission.
-- **Exit code** — non-zero when blocking issues are found, so the job fails and branch protections can enforce it.
+- **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps. The `results.sarif` file is the bandit SARIF report; it is also uploaded to GitHub Code Scanning with `github/codeql-action/upload-sarif`, making findings visible in the repository's Security tab when the job has `security-events: write` permission.
+- **Exit code** — non-zero when blocking issues are found, or when a tool could not run fully (for bandit: a missing scan dir, a file it cannot parse, or no Python file to scan), so the job fails and branch protections can enforce it.
 
 ## Development
 

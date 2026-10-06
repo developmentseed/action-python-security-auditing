@@ -34,8 +34,9 @@ class Settings(BaseSettings):
     # Tool selection
     tools: str = "bandit,pip-audit"
 
-    # Bandit config — scan dirs and threshold are passed directly to lhoupert/bandit-action;
-    # the Python module only reads the SARIF output and uses the threshold for reporting.
+    # Bandit config — comma-separated scan dirs, relative to the working directory. Bandit
+    # reports every finding; the threshold only decides which ones block the job.
+    bandit_scan_dirs: str = "."
     bandit_severity_threshold: Literal["high", "medium", "low"] = "high"
     bandit_sarif_path: str = "results.sarif"
 
@@ -99,6 +100,7 @@ class Settings(BaseSettings):
 
     github_workflow: str = ""  # Name of the running workflow
     github_step_summary: str = ""  # Path to step summary file
+    github_workspace: str = ""  # Repository root: bandit reports paths relative to it
 
     @property
     def enabled_tools(self) -> list[str]:

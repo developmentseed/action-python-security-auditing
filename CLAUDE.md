@@ -30,7 +30,7 @@ src/python_security_auditing/
 
 - **Build system:** Hatch (`hatchling`)
 - **Python:** ≥ 3.13
-- **Dependencies:** `pydantic-settings`, `pip-audit`
+- **Dependencies:** `pydantic-settings`, `pip-audit`, `bandit[sarif]`
 - **Dev deps:** `pytest`, `pytest-mock`, `mypy` (strict), `ruff`
 
 ### Common Commands
@@ -68,7 +68,7 @@ uv run ruff format src/ tests/
 
 ## Key Design Decisions
 
-- **SARIF input for bandit:** Bandit runs in a separate composite step (`lhoupert/bandit-action`). This package only reads the SARIF output file — it does not invoke bandit directly.
+- **Bandit runs in-process:** `run_bandit()` runs bandit from the package's own environment, writes `results.sarif` at the workspace root (artifact and Code Scanning upload), and reads it back. It fails closed: a crash, a skipped file or no file scanned raises `AuditError`.
 - **PR comment is idempotent:** Uses a hidden HTML marker (`<!-- security-scan-results -->`) to find and update the same comment on subsequent pushes.
 - **Threshold logic:** `check_thresholds()` in `report.py` returns a boolean; the orchestrator translates that to `sys.exit(1)`.
 - **Package manager adapters:** `generate_requirements()` normalizes all package managers to a `requirements.txt` file before passing to `pip-audit`.

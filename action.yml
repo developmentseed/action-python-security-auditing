@@ -40,32 +40,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Resolve bandit targets
+    # A report left by an earlier job (self-hosted runner) must not be uploaded as this one's.
+    - name: Remove an earlier bandit report
       if: contains(inputs.tools, 'bandit')
-      id: resolve-targets
       shell: bash
-      env:
-        WORKING_DIRECTORY: ${{ inputs.working_directory }}
-        BANDIT_SCAN_DIRS: ${{ inputs.bandit_scan_dirs }}
-      run: |
-        if [[ "$WORKING_DIRECTORY" == "." ]]; then
-          echo "targets=$BANDIT_SCAN_DIRS" >> "$GITHUB_OUTPUT"
-        else
-          resolved=""
-          IFS=',' read -ra parts <<< "$BANDIT_SCAN_DIRS"
-          for part in "${parts[@]}"; do
-            [[ "$part" == "." ]] && t="$WORKING_DIRECTORY" || t="$WORKING_DIRECTORY/$part"
-            resolved="${resolved:+$resolved }$t"
-          done
-          echo "targets=$resolved" >> "$GITHUB_OUTPUT"
-        fi
-
-    - name: Run Bandit (static security analysis)
-      if: contains(inputs.tools, 'bandit')
-      continue-on-error: true
-      uses: lhoupert/bandit-action@e2d48932beda5cc8c50cb45ed39f8d873ef2d365
-      with:
-        targets: ${{ steps.resolve-targets.outputs.targets }}
+      run: rm -f -- "$GITHUB_WORKSPACE/results.sarif"
 
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -79,6 +58,7 @@ runs:
       working-directory: ${{ inputs.working_directory }}
       env:
         TOOLS: ${{ inputs.tools }}
+        BANDIT_SCAN_DIRS: ${{ inputs.bandit_scan_dirs }}
         BANDIT_SEVERITY_THRESHOLD: ${{ inputs.bandit_severity_threshold }}
         BANDIT_SARIF_PATH: ${{ github.workspace }}/results.sarif
         PIP_AUDIT_BLOCK_ON: ${{ inputs.pip_audit_block_on }}
@@ -90,6 +70,16 @@ runs:
         INPUT_DEBUG: ${{ inputs.debug }}
         RUNNER_DEBUG: ${{ runner.debug }}
       run: uv run --no-project --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
+
+    # results.sarif exists only if bandit scanned every file in this job: the first step removes
+    # an earlier one, and the audit deletes it when bandit fails (an empty report would close
+    # every open alert). Runs before the artifact upload, so a failed upload cannot skip it.
+    - name: Upload bandit SARIF to Code Scanning
+      if: contains(inputs.tools, 'bandit') && hashFiles('results.sarif') != ''
+      continue-on-error: true # needs `security-events: write`; the audit result stands without it
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      with:
+        sarif_file: ${{ github.workspace }}/results.sarif
 
     - name: Upload ${{ inputs.artifact_name }}
       if: always()

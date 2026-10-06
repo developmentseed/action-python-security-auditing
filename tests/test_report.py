@@ -219,6 +219,15 @@ def test_markdown_pip_audit_error(bandit_issues: dict[str, Any]) -> None:
     assert "No vulnerabilities found" not in md
 
 
+def test_markdown_bandit_error(pip_fixable: list[Any]) -> None:
+    md = build_markdown({}, pip_fixable, Settings(), bandit_error="bandit failed (exit 2)")
+    assert "bandit did NOT run" in md
+    assert "bandit failed (exit 2)" in md
+    assert "No issues found" not in md
+    assert "requests" in md  # pip-audit results are still shown
+    assert "Blocking issues found" in md
+
+
 def test_markdown_run_url(
     bandit_clean: dict[str, Any], pip_clean: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

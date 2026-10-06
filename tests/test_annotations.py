@@ -123,6 +123,30 @@ def test_pip_audit_error_emits_escaped_error(
     assert out == "::error::pip-audit did NOT run: uv failed%0A100%25 broken\n"
 
 
+def test_bandit_error_emits_escaped_error(
+    pip_clean: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    emit_annotations({}, pip_clean, Settings(), bandit_error="bandit failed (exit 2):\nusage")
+    out = capsys.readouterr().out
+    assert out == "::error::bandit did NOT run: bandit failed (exit 2):%0Ausage\n"
+
+
+def test_bandit_file_property_is_escaped(
+    pip_clean: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """In a property value ':' and ',' are separators, so they must be %-encoded too."""
+    result = {"issue_severity": "HIGH", "filename": "a,b:c%.py", "line_number": 3, "test_id": "B1"}
+    emit_annotations({"results": [result]}, pip_clean, Settings())
+    assert capsys.readouterr().out == "::error file=a%2Cb%3Ac%25.py,line=3::[B1] \n"
+
+
+def test_bandit_without_file_metrics_warns(
+    bandit_clean: dict[str, Any], pip_clean: list[Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    emit_annotations({**bandit_clean, "files_read": None}, pip_clean, Settings())
+    assert capsys.readouterr().out.startswith("::warning::bandit reported no file metrics")
+
+
 def test_bandit_only_tool_skips_pip(
     bandit_clean: dict[str, Any],
     pip_fixable: list[Any],
