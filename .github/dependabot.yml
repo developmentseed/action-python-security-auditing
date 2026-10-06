@@ -8,8 +8,15 @@ updates:
       prefix: "ci"
     cooldown:
       default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
-  - package-ecosystem: pip
+  # The project is locked with uv (uv.lock), so use the uv ecosystem rather than pip.
+  - package-ecosystem: uv
     directory: /
     exclude-paths:
       - "integration-tests/**"
@@ -19,3 +26,31 @@ updates:
       prefix: "deps"
     cooldown:
       default-days: 7
+    groups:
+      python:
+        patterns: ["*"]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # integration-tests/cases/* are deliberately vulnerable fixtures: never update them.
+  # exclude-paths above only affects version updates; `ignore` also covers security updates.
+  - package-ecosystem: uv
+    directories:
+      - "/integration-tests/cases/*"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+
+  - package-ecosystem: pip
+    directories:
+      - "/integration-tests/cases/*"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
