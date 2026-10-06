@@ -168,7 +168,7 @@ jobs:
 
       - name: Set up uv
         if: matrix.setup == 'uv'
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Generate uv.lock
         if: matrix.setup == 'uv'
@@ -177,7 +177,7 @@ jobs:
 
       - name: Set up Poetry
         if: matrix.setup == 'poetry'
-        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+        uses: snok/install-poetry@a783c322200f0519c7926aa6faa857c4e23e9263 # v1.4.2
 
       - name: Generate poetry.lock
         if: matrix.setup == 'poetry'
