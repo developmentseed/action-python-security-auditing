@@ -14,10 +14,16 @@ _SEVERITY_TO_LEVEL: dict[str, str] = {
 _SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
+def _escape(text: str) -> str:
+    """Escape workflow-command message data."""
+    return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
 def emit_annotations(
     bandit_report: dict[str, Any],
     pip_audit_report: list[dict[str, Any]],
     settings: Settings,
+    pip_audit_error: str = "",
 ) -> None:
     """Print GitHub Actions workflow commands to stdout.
 
@@ -37,15 +43,14 @@ def emit_annotations(
             fname = result.get("filename", "")
             line = result.get("line_number", 0)
             test_id = result.get("test_id", "")
-            text = (
-                result.get("issue_text", "")
-                .replace("%", "%25")
-                .replace("\r", "%0D")
-                .replace("\n", "%0A")
-            )
+            text = _escape(result.get("issue_text", ""))
             print(f"::{level} file={fname},line={line}::[{test_id}] {text}")
 
     if "pip-audit" in settings.enabled_tools:
+        if pip_audit_error:
+            print(f"::error::pip-audit did NOT run: {_escape(pip_audit_error)}")
+        elif not any("skip_reason" not in pkg for pkg in pip_audit_report):
+            print("::warning::pip-audit audited 0 dependencies, so nothing was checked")
         for pkg in pip_audit_report:
             if not pkg.get("vulns"):
                 continue

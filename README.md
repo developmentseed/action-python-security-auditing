@@ -304,7 +304,7 @@ If you run this action from more than one workflow on the same PR with `comment_
 
 ## How blocking works
 
-The job fails (non-zero exit) when **either** tool finds issues above its configured threshold.
+The job fails (non-zero exit) when **either** tool finds issues above its configured threshold. It also fails when pip-audit cannot run, for example when the export fails or the requirements file is missing.
 
 **Bandit threshold** (`bandit_severity_threshold`): findings at or above the threshold block the job.
 
@@ -330,7 +330,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 | `bandit_scan_dirs` | `.` | Comma-separated directories for bandit to scan (relative to `working_directory`) |
 | `bandit_severity_threshold` | `high` | Minimum severity that blocks the job: `high`, `medium`, or `low` |
 | `pip_audit_block_on` | `fixable` | When pip-audit findings block the job: `fixable`, `all`, or `none` |
-| `package_manager` | `requirements` | How to resolve deps for pip-audit: `uv`, `pip`, `poetry`, `pipenv`, `requirements` |
+| `package_manager` | `requirements` | How to resolve deps for pip-audit: `uv`, `poetry`, `pipenv`, `requirements`. For a pip environment, run `pip freeze > requirements.txt` first and use `requirements` |
 | `requirements_file` | `requirements.txt` | Path to requirements file when `package_manager=requirements` |
 | `working_directory` | `.` | Directory to run the audit from (useful for monorepos) |
 | `comment_on` | `never` | When to post a PR comment: `never`, `blocking` (only when issues block the job), or `always` |

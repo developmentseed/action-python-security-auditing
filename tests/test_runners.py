@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from python_security_auditing.runners import generate_requirements, read_bandit_sarif, run_pip_audit
+from python_security_auditing.runners import (
+    AuditError,
+    generate_requirements,
+    read_bandit_sarif,
+    run_pip_audit,
+)
 from python_security_auditing.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
+CLEAN_REPORT = json.dumps({"dependencies": [], "fixes": []})
 
 
 # ---------------------------------------------------------------------------
@@ -19,11 +26,24 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 
-def test_requirements_mode_returns_configured_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_requirements_mode_returns_configured_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "custom-requirements.txt").write_text("requests==2.31.0\n")
     monkeypatch.setenv("PACKAGE_MANAGER", "requirements")
     monkeypatch.setenv("REQUIREMENTS_FILE", "custom-requirements.txt")
     s = Settings()
     assert generate_requirements(s) == Path("custom-requirements.txt")
+
+
+def test_requirements_mode_raises_when_file_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PACKAGE_MANAGER", "requirements")
+    with pytest.raises(AuditError, match="requirements file not found: requirements.txt"):
+        generate_requirements(Settings())
 
 
 def test_uv_mode_calls_uv_export(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -42,24 +62,18 @@ def test_uv_mode_calls_uv_export(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     assert "export" in cmd
     assert "--format" in cmd
     assert "requirements-txt" in cmd
+    # the caller's own project is not on PyPI: emitting it makes pip-audit build it
+    assert "--no-emit-project" in cmd
     assert str(result).endswith("-requirements.txt")
 
 
-def test_pip_mode_calls_pip_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pip_mode_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`pip freeze` would list the action's own environment, so pip mode must fail."""
     monkeypatch.setenv("PACKAGE_MANAGER", "pip")
-    s = Settings()
-
-    freeze_output = "requests==2.31.0\n"
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run") as mock_run,
-    ):
-        mock_run.return_value = MagicMock(returncode=0, stdout=freeze_output)
-        result = generate_requirements(s)
-
-    cmd = mock_run.call_args[0][0]
-    assert cmd == ["pip", "freeze"]
-    assert result.read_text() == freeze_output
+    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
+        with pytest.raises(AuditError, match=r"pip freeze > requirements\.txt"):
+            generate_requirements(Settings())
+    mock_run.assert_not_called()
 
 
 def test_poetry_mode_calls_poetry_export(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,7 +96,11 @@ def test_poetry_mode_calls_poetry_export(monkeypatch: pytest.MonkeyPatch) -> Non
     assert str(result).endswith("-requirements.txt")
 
 
-def test_pipenv_mode_calls_pipenv_requirements(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pipenv_mode_calls_pipenv_requirements(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "Pipfile.lock").write_text("{}")
     monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
     s = Settings()
 
@@ -181,19 +199,27 @@ def test_run_pip_audit_parses_json(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert (tmp_path / "pip-audit-report.json").exists()
 
 
-def test_run_pip_audit_returns_empty_on_no_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("returncode", "stdout"),
+    [(1, ""), (0, ""), (1, "Traceback (most recent call last):"), (0, "[]"), (2, "{}")],
+)
+def test_run_pip_audit_raises_without_json_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, returncode: int, stdout: str
 ) -> None:
+    """pip-audit exits 1 for findings AND for fatal errors: only a JSON report counts."""
     monkeypatch.chdir(tmp_path)
 
     with (
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
         patch("python_security_auditing.runners.subprocess.run") as mock_run,
     ):
-        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="")
-        report = run_pip_audit(Path("requirements.txt"))
+        mock_run.return_value = MagicMock(
+            returncode=returncode, stderr="ERROR:pip_audit._cli:boom", stdout=stdout
+        )
+        with pytest.raises(AuditError, match=rf"exit {returncode}\):\nERROR:pip_audit\._cli:boom"):
+            run_pip_audit(Path("requirements.txt"))
 
-    assert report == []
+    assert not (tmp_path / "pip-audit-report.json").exists()
 
 
 def test_run_pip_audit_uses_requirements_path(
@@ -206,7 +232,7 @@ def test_run_pip_audit_uses_requirements_path(
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
         patch("python_security_auditing.runners.subprocess.run") as mock_run,
     ):
-        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="[]")
+        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout=CLEAN_REPORT)
         run_pip_audit(req_path)
 
     cmd = mock_run.call_args[0][0]
@@ -215,85 +241,82 @@ def test_run_pip_audit_uses_requirements_path(
     assert "json" in cmd
 
 
-def test_run_pip_audit_command_includes_no_deps(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("package_manager", "disable_pip"),
+    [("uv", True), ("poetry", True), ("pipenv", True), ("requirements", False)],
+)
+def test_run_pip_audit_disables_pip_for_pinned_exports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, package_manager: str, disable_pip: bool
 ) -> None:
+    """Exports are fully pinned; a requirements file may not be, so pip resolves it."""
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PACKAGE_MANAGER", package_manager)
     with (
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
         patch("python_security_auditing.runners.subprocess.run") as mock_run,
     ):
-        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="[]")
-        run_pip_audit(Path("requirements.txt"))
+        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout=CLEAN_REPORT)
+        run_pip_audit(Path("requirements.txt"), Settings())
     cmd = mock_run.call_args[0][0]
     assert "--no-deps" in cmd
+    assert ("--disable-pip" in cmd) is disable_pip
 
 
 # ---------------------------------------------------------------------------
-# generate_requirements — missing lockfile handling
+# generate_requirements — export failures must fail, not return an empty file
 # ---------------------------------------------------------------------------
 
 
-def test_generate_requirements_uv_returns_empty_on_missing_lockfile(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("package_manager", ["uv", "poetry", "pipenv"])
+def test_generate_requirements_raises_when_export_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, package_manager: str
 ) -> None:
-    monkeypatch.setenv("PACKAGE_MANAGER", "uv")
-    s = Settings()
-    exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "Pipfile.lock").write_text("{}")
+    monkeypatch.setenv("PACKAGE_MANAGER", package_manager)
+    tmpdir = tmp_path / "tmp"
+    tmpdir.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmpdir))
+    exc = subprocess.CalledProcessError(2, package_manager, stderr="lockfile is broken")
+    # poetry first runs `poetry self add`, which may fail without consequence
+    side_effect = [MagicMock(returncode=1), exc] if package_manager == "poetry" else exc
     with (
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run", side_effect=exc),
+        patch("python_security_auditing.runners.subprocess.run", side_effect=side_effect),
     ):
-        result = generate_requirements(s)
-    assert result.exists()
-    assert result.stat().st_size == 0
+        with pytest.raises(AuditError, match=f"{package_manager} .*failed: lockfile is broken"):
+            generate_requirements(Settings())
+    assert list(tmpdir.iterdir()) == []  # no leaked temp requirements file
 
 
-def test_generate_requirements_poetry_returns_empty_on_missing_lockfile(
-    monkeypatch: pytest.MonkeyPatch,
+def test_generate_requirements_pipenv_raises_without_lockfile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("PACKAGE_MANAGER", "poetry")
-    s = Settings()
-    export_exc = subprocess.CalledProcessError(1, "poetry", stderr="poetry.lock not found")
+    """`pipenv requirements` exits 0 with no packages when Pipfile.lock is missing."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
+    with patch("python_security_auditing.runners.subprocess.run") as mock_run:
+        with pytest.raises(AuditError, match="Pipfile.lock not found"):
+            generate_requirements(Settings())
+    mock_run.assert_not_called()
+
+
+def test_generate_requirements_pipenv_uses_lockfile_next_to_pipenv_pipfile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """pipenv keeps the lock at <PIPENV_PIPFILE>.lock, not in the current directory."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "Pipfile.lock").write_text("{}")
+    monkeypatch.setenv("PIPENV_PIPFILE", str(tmp_path / "sub" / "Pipfile"))
+    monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
     with (
         patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
         patch("python_security_auditing.runners.subprocess.run") as mock_run,
     ):
-        # self add uses check=False so a non-zero return is silently ignored;
-        # export raises CalledProcessError to simulate a missing lockfile
-        mock_run.side_effect = [MagicMock(returncode=1), export_exc]
-        result = generate_requirements(s)
-    assert result.exists()
-    assert result.stat().st_size == 0
-
-
-def test_generate_requirements_pipenv_returns_empty_on_missing_lockfile(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("PACKAGE_MANAGER", "pipenv")
-    s = Settings()
-    exc = subprocess.CalledProcessError(1, "pipenv", stderr="Pipfile.lock not found")
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run", side_effect=exc),
-    ):
-        result = generate_requirements(s)
-    assert result.exists()
-    assert result.stat().st_size == 0
-
-
-def test_generate_requirements_uv_warns_on_missing_lockfile(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("PACKAGE_MANAGER", "uv")
-    s = Settings()
-    exc = subprocess.CalledProcessError(2, "uv", stderr="No uv.lock found")
-    with (
-        patch("python_security_auditing.runners.shutil.which", side_effect=lambda exe: exe),
-        patch("python_security_auditing.runners.subprocess.run", side_effect=exc),
-    ):
-        generate_requirements(s)
-    assert "uv export failed" in capsys.readouterr().err
+        mock_run.return_value = MagicMock(returncode=0, stdout="requests==2.31.0\n")
+        result = generate_requirements(Settings())
+    assert result.read_text() == "requests==2.31.0\n"
 
 
 # ---------------------------------------------------------------------------
