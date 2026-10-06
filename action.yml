@@ -72,14 +72,19 @@ runs:
       run: uv run --no-project --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
 
     # results.sarif exists only if bandit scanned every file in this job: the first step removes
-    # an earlier one, and the audit deletes it when bandit fails (an empty report would close
-    # every open alert). Runs before the artifact upload, so a failed upload cannot skip it.
+    # an earlier one, and the audit deletes it when bandit fails or skips files (an empty or
+    # partial report would close open alerts). Runs before the artifact upload, so a failed
+    # upload cannot skip it.
     - name: Upload bandit SARIF to Code Scanning
       if: contains(inputs.tools, 'bandit') && hashFiles('results.sarif') != ''
       continue-on-error: true # needs `security-events: write`; the audit result stands without it
       uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
       with:
         sarif_file: ${{ github.workspace }}/results.sarif
+        # A job may upload one SARIF per category, so each working_directory gets its own.
+        # For '.' it stays empty (= no category, the default analysis), as the bandit fork's
+        # upload did, so existing alerts keep matching.
+        category: ${{ inputs.working_directory != '.' && format('bandit/{0}', inputs.working_directory) || '' }}
 
     - name: Upload ${{ inputs.artifact_name }}
       if: always()
