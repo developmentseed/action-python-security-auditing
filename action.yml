@@ -63,7 +63,7 @@ runs:
     - name: Run Bandit (static security analysis)
       if: contains(inputs.tools, 'bandit')
       continue-on-error: true
-      uses: lhoupert/bandit-action@18022d5292d04b21fae1bfa44597b94402ba7365
+      uses: lhoupert/bandit-action@e2d48932beda5cc8c50cb45ed39f8d873ef2d365
       with:
         targets: ${{ steps.resolve-targets.outputs.targets }}
 
