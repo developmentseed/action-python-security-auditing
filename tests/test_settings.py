@@ -34,6 +34,20 @@ def test_enabled_tools_custom(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.enabled_tools == ["pip-audit"]
 
 
+def test_enabled_tools_are_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    """action.yml's contains() is case-insensitive, so `Bandit` must run bandit here too."""
+    monkeypatch.setenv("TOOLS", " Bandit , PIP-AUDIT ")
+    assert Settings().enabled_tools == ["bandit", "pip-audit"]
+
+
+@pytest.mark.parametrize("tools", ["bandit,banditt", "", " , "])
+def test_unknown_or_no_tools_are_rejected(monkeypatch: pytest.MonkeyPatch, tools: str) -> None:
+    """A typo would otherwise scan nothing and pass."""
+    monkeypatch.setenv("TOOLS", tools)
+    with pytest.raises(ValidationError, match="tools"):
+        Settings()
+
+
 def test_enabled_tools_whitespace(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TOOLS", " bandit , pip-audit ")
     s = Settings()
