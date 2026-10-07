@@ -9,4 +9,4 @@
 - `pipenv requirements` correctly reads `Pipfile.lock` and exports deps
 - Bandit scans the flat project directory
 - No bandit issues, no vulnerable deps
-- `Pipfile.lock` is **committed** — tests the action with a pre-existing lockfile
+- `Pipfile.lock` is **not committed**: CI generates it (`pipenv install`), so the case audits the latest releases

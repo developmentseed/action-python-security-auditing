@@ -34,7 +34,8 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  # integration-tests/cases/* are deliberately pinned fixtures: never update them.
+  # integration-tests/cases/* are fixtures: never update them. The vulnerable ones are pinned
+  # on purpose; the clean ones are unpinned and unlocked, so CI audits the latest releases.
   # `ignore` also applies to security updates. Directories are listed explicitly per
   # ecosystem: a glob would also match cases without a manifest for that ecosystem.
   - package-ecosystem: pip # requirements.txt, poetry and pipenv cases
