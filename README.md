@@ -59,7 +59,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+      - uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
         with:
           package_manager: uv        # export handled automatically
           bandit_scan_dirs: 'src/'
@@ -137,7 +137,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+      - uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
 ```
 
 This runs both bandit and pip-audit with sensible defaults: blocks the job on HIGH-severity code issues and on dependency vulnerabilities that have a fix available.
@@ -171,7 +171,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **uv:**
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: uv
     bandit_scan_dirs: 'src/'
@@ -179,7 +179,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Poetry:**
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: poetry
     bandit_scan_dirs: 'src/'
@@ -187,7 +187,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Pipenv:**
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: pipenv
     bandit_scan_dirs: 'src/'
@@ -195,7 +195,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 
 **Plain requirements file (default):**
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     requirements_file: requirements/prod.txt
     bandit_scan_dirs: 'src/'
@@ -206,7 +206,7 @@ Pass `package_manager` to match how your project manages dependencies. The actio
 When your source code spans more than one directory, pass a comma-separated list to `bandit_scan_dirs`:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: uv
     bandit_scan_dirs: 'src/,scripts/'
@@ -228,7 +228,7 @@ exclude = */.git/*,*/__pycache__/*,*/.tox/*,*/.eggs/*,*.egg,*/.venv/*,path/to/fi
 Set `working_directory` to the project root within the repo. All relative paths (scan dirs, requirements file) are resolved from there:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     working_directory: services/api
     package_manager: uv
@@ -240,7 +240,7 @@ Set `working_directory` to the project root within the repo. All relative paths 
 Useful when you manage dependencies externally or run pip-audit in a separate job:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     tools: bandit
     bandit_scan_dirs: 'src/'
@@ -251,7 +251,7 @@ Useful when you manage dependencies externally or run pip-audit in a separate jo
 Useful when you already run bandit separately or only care about known CVEs in dependencies:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     tools: pip-audit
     package_manager: uv
@@ -262,7 +262,7 @@ Useful when you already run bandit separately or only care about known CVEs in d
 Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities regardless of whether a fix exists. Suitable for high-assurance services or regulated environments:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: poetry
     bandit_severity_threshold: medium
@@ -274,7 +274,7 @@ Block on any bandit finding at MEDIUM or above, and on all known vulnerabilities
 Add the action first as an observer: findings appear as inline annotations and in the step summary without ever failing the job. Tighten the thresholds once your team has addressed the backlog:
 
 ```yaml
-- uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+- uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
   with:
     package_manager: uv
     bandit_severity_threshold: low   # report everything
@@ -303,7 +303,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: developmentseed/action-python-security-auditing@cb6ac94657ab575b25dbce90d45b0e3da98401ce # v0.6.1
+      - uses: developmentseed/action-python-security-auditing@74463a5e49cb840c1bf1604f748ffc9bece51171 # v1.0.1
         with:
           package_manager: uv
           # comment_on defaults to never — no PR comment is posted for scheduled runs
