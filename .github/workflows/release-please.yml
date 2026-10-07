@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: write # Create releases, tags, and release branches
+      contents: write # Create releases and tags; push and delete release and pin README branches
       pull-requests: write # Open and update pin README pull requests
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -46,6 +46,7 @@ jobs:
 
       - name: Pin README to release SHA
         if: ${{ steps.release.outputs.release_created }}
+        shell: bash # -eo pipefail, so a failed gh pr list fails the step
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
@@ -60,8 +61,16 @@ jobs:
           git checkout -b "$BRANCH"
           git commit -m "chore: pin README to ${RELEASE_TAG_NAME}"
           git push origin "$BRANCH"
-          gh pr create \
+          PR_URL=$(gh pr create \
             --title "chore: pin README to ${RELEASE_TAG_NAME}" \
             --body "Automated: pin README SHA references to release ${RELEASE_TAG_NAME}." \
             --base main \
-            --head "$BRANCH"
+            --head "$BRANCH")
+          echo "Opened ${PR_URL}"
+          # Close older pin PRs: one merged first would pin an older release and make this PR conflict
+          gh pr list --app github-actions --json number,headRefName,state \
+            --jq '.[] | select(.state == "OPEN" and (.headRefName | startswith("chore/pin-readme-")) and .number != '"${PR_URL##*/}"') | .number' |
+            while read -r PR; do
+              gh pr close "$PR" --delete-branch
+              gh pr comment "$PR" --body "Superseded by ${PR_URL}."
+            done
