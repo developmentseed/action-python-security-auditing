@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/developmentseed/action-python-security-auditing/compare/v1.0.0...v1.0.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* stop setting UV_PYTHON for the caller's job ([#89](https://github.com/developmentseed/action-python-security-auditing/issues/89)) ([9639cfe](https://github.com/developmentseed/action-python-security-auditing/commit/9639cfe8d45c0a58b45d55eb68d1f8e6080629d4))
+
 ## [1.0.0](https://github.com/developmentseed/action-python-security-auditing/compare/v0.6.1...v1.0.0) (2026-10-06)
 
 
