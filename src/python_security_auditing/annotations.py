@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .report import bandit_skipped_message
+from .report import bandit_skipped_message, unique_vulns
 from .settings import Settings
 
 _SEVERITY_TO_LEVEL: dict[str, str] = {
@@ -71,7 +71,7 @@ def emit_annotations(
                 continue
             name = pkg.get("name", "")
             version = pkg.get("version", "")
-            for vuln in pkg["vulns"]:
+            for vuln in unique_vulns(pkg["vulns"]):
                 vid = vuln.get("id", "")
                 fix = ", ".join(vuln.get("fix_versions", [])) or "no fix available"
                 print(f"::warning::pip-audit: {name}@{version} — {vid} (fix: {fix})")

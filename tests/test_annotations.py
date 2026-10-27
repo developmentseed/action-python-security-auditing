@@ -84,6 +84,26 @@ def test_pip_audit_fixable_emits_warning(
     assert "GHSA-" in out
 
 
+def test_pip_audit_duplicate_advisory_emits_one_warning(
+    bandit_clean: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    vuln = {"id": "PYSEC-2026-4320", "aliases": ["GHSA-6q48-6c7w-9gw2"]}
+    report = [
+        {
+            "name": "certifi",
+            "version": "2026.7.22",
+            "vulns": [
+                {**vuln, "fix_versions": ["2026.10.18"]},
+                {**vuln, "fix_versions": ["2026.10.19"]},
+            ],
+        }
+    ]
+    emit_annotations(bandit_clean, report, Settings())
+    out = capsys.readouterr().out
+    assert out.count("::warning::pip-audit:") == 1
+    assert "PYSEC-2026-4320 (fix: 2026.10.18, 2026.10.19)" in out
+
+
 def test_pip_audit_no_file_line_in_annotation(
     bandit_clean: dict[str, Any], pip_fixable: list[Any], capsys: pytest.CaptureFixture[str]
 ) -> None:

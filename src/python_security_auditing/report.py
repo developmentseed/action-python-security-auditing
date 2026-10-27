@@ -28,6 +28,38 @@ def bandit_skipped_message(skipped: list[dict[str, Any]]) -> str:
     )
 
 
+def unique_vulns(vulns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge advisories pip-audit lists more than once (same ID or alias), keeping all fixes."""
+    unique: list[dict[str, Any]] = []
+    seen: dict[str, dict[str, Any]] = {}
+    for vuln in vulns:
+        ids = {vuln.get("id", ""), *vuln.get("aliases", [])} - {""}
+        kept = next((seen[i] for i in ids if i in seen), None)
+        if kept is None:
+            kept = {**vuln, "fix_versions": list(vuln.get("fix_versions", []))}
+            unique.append(kept)
+        else:
+            fixes = kept["fix_versions"]
+            fixes += [v for v in vuln.get("fix_versions", []) if v not in fixes]
+        seen.update(dict.fromkeys(ids, kept))
+    return unique
+
+
+def _summary(description: str) -> str:
+    """First sentence of an advisory, cut at a word, safe for a table cell.
+
+    pip-audit replaces newlines with spaces, so paragraphs end in two spaces and
+    GHSA-style headings ("### Summary") sit inline: skip them.
+    """
+    paragraphs = [p.strip() for p in description.split("  ")]
+    text = next((p for p in paragraphs if p and not p.startswith("#")), description.strip())
+    sentence, end, _ = text.partition(". ")
+    text = sentence + end.strip()
+    if len(text) > 120:
+        text = text[:120].rsplit(" ", 1)[0] + "…"
+    return text.replace("|", "\\|")
+
+
 def build_markdown(
     bandit_report: dict[str, Any],
     pip_audit_report: list[dict[str, Any]],
@@ -166,20 +198,23 @@ def _pip_audit_section(report: list[dict[str, Any]], settings: Settings, error: 
         return "\n".join(lines)
 
     lines.append("| Package | Version | ID | Fix Versions | Description |\n|---|---|---|---|---|")
-    for pkg in vulnerable:
+    merged = [(pkg, unique_vulns(pkg["vulns"])) for pkg in vulnerable]
+    for pkg, vulns in merged:
         name = pkg.get("name", "")
         version = pkg.get("version", "")
-        for vuln in pkg.get("vulns", []):
+        for vuln in vulns:
             vid = vuln.get("id", "")
-            fix_versions = ", ".join(vuln.get("fix_versions", [])) or "none"
-            desc = (vuln.get("description", "") or "")[:120].replace("|", "\\|")
+            fix_versions = ", ".join(vuln["fix_versions"]) or "none"
+            desc = _summary(vuln.get("description", "") or "")
             lines.append(f"| {name} | {version} | {vid} | {fix_versions} | {desc} |")
 
-    total_vulns = sum(len(pkg.get("vulns", [])) for pkg in vulnerable)
-    fixable = sum(1 for pkg in vulnerable for v in pkg.get("vulns", []) if v.get("fix_versions"))
+    reported = sum(len(pkg["vulns"]) for pkg in vulnerable)
+    unique = sum(len(vulns) for _, vulns in merged)
+    fixable = sum(1 for _, vulns in merged for v in vulns if v["fix_versions"])
+    dupes = f"; pip-audit reported {reported}, duplicates merged" if reported > unique else ""
     lines.append(
-        f"\n_{total_vulns} vulnerability/vulnerabilities found "
-        f"({fixable} fixable) across {len(vulnerable)} package(s)._\n"
+        f"\n_{unique} vulnerability/vulnerabilities found "
+        f"({fixable} fixable) across {len(vulnerable)} package(s){dupes}._\n"
     )
     return "\n".join(lines)
 

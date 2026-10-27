@@ -194,6 +194,58 @@ def test_markdown_pip_table(bandit_clean: dict[str, Any], pip_fixable: list[Any]
     assert "GHSA-j8r2-6x86-q33q" in md
 
 
+def test_markdown_pip_merges_duplicate_advisories(bandit_clean: dict[str, Any]) -> None:
+    """pip-audit can list one advisory twice, by ID or by alias: one row, every fix version."""
+    vuln = {"id": "PYSEC-2026-4320", "aliases": ["GHSA-6q48-6c7w-9gw2"], "description": "Bad CA."}
+    report = [
+        {
+            "name": "certifi",
+            "version": "2026.7.22",
+            "vulns": [
+                {**vuln, "fix_versions": ["2026.10.18"]},
+                {**vuln, "fix_versions": ["2026.10.19"]},
+                {"id": "GHSA-6q48-6c7w-9gw2", "fix_versions": ["2026.10.18"], "aliases": []},
+            ],
+        }
+    ]
+    md = build_markdown(bandit_clean, report, Settings())
+    assert md.count("| certifi |") == 1
+    assert "| PYSEC-2026-4320 | 2026.10.18, 2026.10.19 | Bad CA. |" in md
+    assert (
+        "_1 vulnerability/vulnerabilities found (1 fixable) across 1 package(s); "
+        "pip-audit reported 3, duplicates merged._"
+    ) in md
+
+
+def test_markdown_pip_description_skips_markdown_headings(bandit_clean: dict[str, Any]) -> None:
+    """pip-audit flattens newlines to spaces, leaving GHSA "### Summary" headings inline."""
+    description = (
+        "### Summary  The keepalive timeout was not used. It applies to the first request.  "
+        "### Impact  An attacker could wait."
+    )
+    report = [
+        {
+            "name": "aiohttp",
+            "version": "3.14.3",
+            "vulns": [{"id": "CVE-1", "fix_versions": ["3.14.4"], "description": description}],
+        }
+    ]
+    md = build_markdown(bandit_clean, report, Settings())
+    assert "| CVE-1 | 3.14.4 | The keepalive timeout was not used. |" in md
+
+
+def test_markdown_pip_description_cut_at_a_word(bandit_clean: dict[str, Any]) -> None:
+    report = [
+        {
+            "name": "pkg",
+            "version": "1.0",
+            "vulns": [{"id": "CVE-1", "fix_versions": [], "description": "abcdefghi " * 20}],
+        }
+    ]
+    md = build_markdown(bandit_clean, report, Settings())
+    assert f"| none | {'abcdefghi ' * 11}abcdefghi… |" in md
+
+
 def test_markdown_pip_counts_audited_and_skipped(bandit_clean: dict[str, Any]) -> None:
     report: list[dict[str, Any]] = [
         {"name": "requests", "version": "2.32.0", "vulns": []},
