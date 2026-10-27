@@ -217,12 +217,40 @@ def test_markdown_pip_merges_duplicate_advisories(bandit_clean: dict[str, Any]) 
     ) in md
 
 
-def test_markdown_pip_description_skips_markdown_headings(bandit_clean: dict[str, Any]) -> None:
-    """pip-audit flattens newlines to spaces, leaving GHSA "### Summary" headings inline."""
-    description = (
+def test_markdown_pip_alias_chain_merges_in_id_order(bandit_clean: dict[str, Any]) -> None:
+    """An advisory aliasing two earlier ones joins the first match, whatever the hash seed."""
+    report = [
+        {
+            "name": "pkg",
+            "version": "1.0",
+            "vulns": [
+                {"id": "PYSEC-A", "aliases": ["CVE-X"], "fix_versions": ["1.1"]},
+                {"id": "PYSEC-B", "aliases": ["CVE-Y"], "fix_versions": ["1.2"]},
+                {"id": "PYSEC-C", "aliases": ["CVE-X", "CVE-Y"], "fix_versions": ["1.3"]},
+            ],
+        }
+    ]
+    md = build_markdown(bandit_clean, report, Settings())
+    assert "| PYSEC-A | 1.1, 1.3 |" in md
+    assert "| PYSEC-B | 1.2 |" in md
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        # heading on its own line, then a blank line
         "### Summary  The keepalive timeout was not used. It applies to the first request.  "
-        "### Impact  An attacker could wait."
-    )
+        "### Impact  An attacker could wait.",
+        # heading followed by a single newline
+        "### Summary The keepalive timeout was not used. It applies.  ### Impact  Waits.",
+        # multi-word heading on its own line
+        "## Vulnerability Summary  The keepalive timeout was not used. It applies.",
+    ],
+)
+def test_markdown_pip_description_skips_markdown_headings(
+    bandit_clean: dict[str, Any], description: str
+) -> None:
+    """pip-audit flattens newlines to spaces, leaving GHSA "### Summary" headings inline."""
     report = [
         {
             "name": "aiohttp",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePath
 from typing import Any
 
@@ -33,7 +34,7 @@ def unique_vulns(vulns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     unique: list[dict[str, Any]] = []
     seen: dict[str, dict[str, Any]] = {}
     for vuln in vulns:
-        ids = {vuln.get("id", ""), *vuln.get("aliases", [])} - {""}
+        ids = [i for i in (vuln.get("id", ""), *vuln.get("aliases", [])) if i]
         kept = next((seen[i] for i in ids if i in seen), None)
         if kept is None:
             kept = {**vuln, "fix_versions": list(vuln.get("fix_versions", []))}
@@ -48,11 +49,15 @@ def unique_vulns(vulns: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _summary(description: str) -> str:
     """First sentence of an advisory, cut at a word, safe for a table cell.
 
-    pip-audit replaces newlines with spaces, so paragraphs end in two spaces and
-    GHSA-style headings ("### Summary") sit inline: skip them.
+    pip-audit replaces newlines with spaces, so paragraphs end in two spaces and a GHSA-style
+    heading is either a paragraph of its own ("### Summary") or, when one newline followed it,
+    glued to its text ("### Summary The parser..."): drop the first, strip the second.
     """
     paragraphs = [p.strip() for p in description.split("  ")]
-    text = next((p for p in paragraphs if p and not p.startswith("#")), description.strip())
+    texts = [
+        re.sub(r"^#+ *\S+ *", "", p) for p in paragraphs if not (p.startswith("#") and "." not in p)
+    ]
+    text = next((t for t in texts if t), description.strip())
     sentence, end, _ = text.partition(". ")
     text = sentence + end.strip()
     if len(text) > 120:
