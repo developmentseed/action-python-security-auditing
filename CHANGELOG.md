@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/developmentseed/action-python-security-auditing/compare/v1.0.2...v1.1.0) (2026-10-28)
+
+
+### Features
+
+* skip dependency releases younger than 7 days and drop the unused lock ([#101](https://github.com/developmentseed/action-python-security-auditing/issues/101)) ([498fbf0](https://github.com/developmentseed/action-python-security-auditing/commit/498fbf0593fecfd3382ca7031d73faf3e95d3c4d))
+
 ## [1.0.2](https://github.com/developmentseed/action-python-security-auditing/compare/v1.0.1...v1.0.2) (2026-10-28)
 
 
