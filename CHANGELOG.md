@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/developmentseed/action-python-security-auditing/compare/v1.0.1...v1.0.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* merge duplicate pip-audit advisories and shorten their descriptions ([#96](https://github.com/developmentseed/action-python-security-auditing/issues/96)) ([2e2b478](https://github.com/developmentseed/action-python-security-auditing/commit/2e2b478e588686d55040c882f2f14ce3fc2aa37e))
+
 ## [1.0.1](https://github.com/developmentseed/action-python-security-auditing/compare/v1.0.0...v1.0.1) (2026-10-07)
 
 
