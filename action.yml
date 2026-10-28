@@ -52,7 +52,7 @@ runs:
     # No `python-version` here: it sets UV_PYTHON for the rest of the caller's job, overriding
     # their project's Python. The audit step passes --python instead.
     - name: Set up uv
-      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
 
     # Dependencies resolve fresh on every run but skip releases younger than the cooldown, the
     # window in which a hijacked PyPI release is usually caught. A flag, not UV_EXCLUDE_NEWER, so
@@ -95,7 +95,7 @@ runs:
     - name: Upload bandit SARIF to Code Scanning
       if: contains(inputs.tools, 'bandit') && hashFiles('results.sarif') != ''
       continue-on-error: true # needs `security-events: write`; the audit result stands without it
-      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
       with:
         sarif_file: ${{ github.workspace }}/results.sarif
         # A job may upload one SARIF per category, so each working_directory gets its own.
@@ -105,7 +105,7 @@ runs:
 
     - name: Upload ${{ inputs.artifact_name }}
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
         name: ${{ inputs.artifact_name }}
         path: |
