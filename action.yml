@@ -51,6 +51,9 @@ runs:
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
+    # Dependencies resolve fresh on every run but skip releases younger than 7 days, the window
+    # in which a hijacked PyPI release is usually caught. A flag, not UV_EXCLUDE_NEWER, so the
+    # caller's own `uv export` still audits their lock as committed.
     - name: Run security audit
       id: audit
       shell: bash
@@ -69,7 +72,7 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         INPUT_DEBUG: ${{ inputs.debug }}
         RUNNER_DEBUG: ${{ runner.debug }}
-      run: uv run --python 3.13 --no-project --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
+      run: uv run --python 3.13 --no-project --exclude-newer "7 days" --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
 
     # results.sarif exists only if bandit scanned every file in this job: the first step removes
     # an earlier one, and the audit deletes it when bandit fails or skips files (an empty or

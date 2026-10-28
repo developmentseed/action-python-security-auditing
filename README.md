@@ -357,6 +357,10 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 - **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps. The `results.sarif` file is the bandit SARIF report; it is also uploaded to GitHub Code Scanning with `github/codeql-action/upload-sarif`, making findings visible in the repository's Security tab when the job has `security-events: write` permission.
 - **Exit code** — non-zero when blocking issues are found, or when a tool could not run fully (for bandit: a missing scan dir, a file it cannot parse, or no Python file to scan), so the job fails and branch protections can enforce it.
 
+## How the action installs its tools
+
+Each run resolves bandit, pip-audit and their dependencies fresh, so fixes reach you without updating the action, but skips any release published in the last 7 days (`uv run --exclude-newer "7 days"`). A hijacked release on PyPI is usually caught and yanked within that window.
+
 ## Development
 
 ```bash

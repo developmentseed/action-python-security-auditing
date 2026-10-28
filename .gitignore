@@ -14,3 +14,4 @@ bandit-report.json
 pip-audit-report.json
 *-requirements.txt
 .claude/
+/uv.lock

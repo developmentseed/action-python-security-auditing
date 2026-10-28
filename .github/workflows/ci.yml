@@ -12,6 +12,10 @@ concurrency:
 permissions:
   contents: read
 
+# The same cooldown as action.yml, so tests and the self-audit resolve what users get.
+env:
+  UV_EXCLUDE_NEWER: 7 days
+
 jobs:
   pre-commit:
     name: Pre-commit
@@ -54,10 +58,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      # action.yml resolves dependencies at runtime (`uv run --no-project --with`):
-      # audit that resolution, as users get it, not the committed dev lock.
-      - name: Resolve dependencies as users get them
-        run: uv lock --upgrade
+      # No committed lock: `uv export` resolves one with the cooldown above, as users get it.
       - uses: ./
         with:
           bandit_scan_dirs: src
