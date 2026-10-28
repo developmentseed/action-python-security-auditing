@@ -36,6 +36,9 @@ inputs:
   debug:
     description: Enable debug logging for the Python audit module
     default: 'false'
+  dependency_cooldown_days:
+    description: Skip releases of the action's own dependencies younger than this many days; 0 turns it off (needed for an index without upload times)
+    default: '7'
 
 runs:
   using: composite
@@ -51,6 +54,9 @@ runs:
     - name: Set up uv
       uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
+    # Dependencies resolve fresh on every run but skip releases younger than the cooldown, the
+    # window in which a hijacked PyPI release is usually caught. A flag, not UV_EXCLUDE_NEWER, so
+    # the caller's own `uv export` still audits their lock as committed.
     - name: Run security audit
       id: audit
       shell: bash
@@ -69,7 +75,18 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         INPUT_DEBUG: ${{ inputs.debug }}
         RUNNER_DEBUG: ${{ runner.debug }}
-      run: uv run --python 3.13 --no-project --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
+        COOLDOWN_DAYS: ${{ inputs.dependency_cooldown_days }}
+      run: |
+        cooldown=()
+        if [ "$COOLDOWN_DAYS" != 0 ]; then
+          [[ "$COOLDOWN_DAYS" =~ ^[0-9]+$ ]] || { echo "::error::dependency_cooldown_days must be a whole number of days"; exit 1; }
+          # An absolute time: uv before 0.9.17 rejects "7 days", and setup-uv installs the uv a
+          # caller pins. GNU date (Linux, Windows) first, then BSD date (macOS).
+          cutoff=$(date -u -d "$COOLDOWN_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
+            date -u -v-"$COOLDOWN_DAYS"d +%Y-%m-%dT%H:%M:%SZ)
+          cooldown=(--exclude-newer "$cutoff")
+        fi
+        uv run --python 3.13 --no-project "${cooldown[@]}" --with "$GITHUB_ACTION_PATH" python -m python_security_auditing
 
     # results.sarif exists only if bandit scanned every file in this job: the first step removes
     # an earlier one, and the audit deletes it when bandit fails or skips files (an empty or

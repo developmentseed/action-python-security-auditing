@@ -348,6 +348,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 | `github_token` | `${{ github.token }}` | Token used for posting PR comments (only needed when `comment_on` is not `never`) |
 | `artifact_name` | `security-audit-reports` | Name of the uploaded artifact |
 | `debug` | `false` | Enable verbose debug logging; also activates automatically when re-running a workflow with "Enable debug logging" |
+| `dependency_cooldown_days` | `7` | Skip releases of the action's own dependencies younger than this many days; `0` turns it off (needed for an index without upload times) |
 
 ## Outputs
 
@@ -356,6 +357,10 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 - **PR comment** — opt-in via `comment_on: blocking` or `comment_on: always`. Created on first run, updated in place on every subsequent run. The comment is keyed on a hidden `<!-- security-scan-results::{workflow-name} -->` marker, so multiple workflows on the same PR each maintain their own separate comment.
 - **Artifact** — `pip-audit-report.json` and `results.sarif` uploaded under the name set by `artifact_name` (default: `security-audit-reports`) for download or downstream steps. The `results.sarif` file is the bandit SARIF report; it is also uploaded to GitHub Code Scanning with `github/codeql-action/upload-sarif`, making findings visible in the repository's Security tab when the job has `security-events: write` permission.
 - **Exit code** — non-zero when blocking issues are found, or when a tool could not run fully (for bandit: a missing scan dir, a file it cannot parse, or no Python file to scan), so the job fails and branch protections can enforce it.
+
+## How the action installs its tools
+
+Each run resolves bandit, pip-audit and their dependencies fresh, so fixes reach you without updating the action, but skips any release published in the last 7 days (`dependency_cooldown_days`). A hijacked release on PyPI is usually caught and removed within that window. If uv installs from an index that does not publish upload times (some private mirrors), set `dependency_cooldown_days: 0`, or nothing can be resolved.
 
 ## Development
 
