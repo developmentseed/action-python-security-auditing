@@ -348,6 +348,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 | `github_token` | `${{ github.token }}` | Token used for posting PR comments (only needed when `comment_on` is not `never`) |
 | `artifact_name` | `security-audit-reports` | Name of the uploaded artifact |
 | `debug` | `false` | Enable verbose debug logging; also activates automatically when re-running a workflow with "Enable debug logging" |
+| `dependency_cooldown_days` | `7` | Skip releases of the action's own dependencies younger than this many days; `0` turns it off (needed for an index without upload times) |
 
 ## Outputs
 
@@ -359,7 +360,7 @@ The job fails (non-zero exit) when **either** tool finds issues above its config
 
 ## How the action installs its tools
 
-Each run resolves bandit, pip-audit and their dependencies fresh, so fixes reach you without updating the action, but skips any release published in the last 7 days (`uv run --exclude-newer "7 days"`). A hijacked release on PyPI is usually caught and yanked within that window.
+Each run resolves bandit, pip-audit and their dependencies fresh, so fixes reach you without updating the action, but skips any release published in the last 7 days (`dependency_cooldown_days`). A hijacked release on PyPI is usually caught and removed within that window. If uv installs from an index that does not publish upload times (some private mirrors), set `dependency_cooldown_days: 0`, or nothing can be resolved.
 
 ## Development
 

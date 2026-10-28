@@ -14,7 +14,8 @@ updates:
         update-types: [minor, patch] # majors stay separate: they change action.yml for users
 
   # No entry for the root project: it commits no lock. action.yml resolves its dependencies on
-  # every run with a 7-day cooldown, and the CI security audit checks that resolution.
+  # every run with a 7-day cooldown, and the CI security audit checks that resolution on every
+  # push and weekly.
 
   # integration-tests/cases/* are fixtures: never update them. The vulnerable ones are pinned
   # on purpose; the clean ones are unpinned and unlocked, so CI audits the latest releases.
